@@ -13,9 +13,7 @@ fn main() {
             let mut report = parsed_report.clone();
             report.remove(i);
             let is_asc = report[0] < report[1];
-            for level_window in report.windows(2) {
-                let (level, next_level) = (level_window[0], level_window[1]);
-                // println!("prev: {} cur: {} maybe_asc: {} gt: {}", level, next_level, maybe_asc, level >= next_level);
+            for (&level, &next_level) in report.iter().zip(report.iter().skip(1)) {
                 if level.abs_diff(next_level) > 3 ||
                     (is_asc && (level >= next_level)) ||
                     (!is_asc && (level <= next_level)) {
