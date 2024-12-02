@@ -1,0 +1,26 @@
+use std::collections::HashMap;
+use std::io;
+use std::io::BufRead;
+
+fn main() {
+    let stdin = io::stdin();
+    let mut lines = stdin.lock().lines();
+    let (mut left, mut right) = (Vec::new(), Vec::new());
+    let mut similarity = HashMap::new();
+
+    while let Some(Ok(line)) = lines.next() {
+        let mut num_str = line.split_whitespace();
+        let left_uint = num_str.next().map(|t| t.parse::<u32>()).unwrap().unwrap();
+        let right_uint = num_str.next().map(|t| t.parse::<u32>()).unwrap().unwrap();
+        left.push(left_uint);
+        right.push(right_uint);
+        *similarity.entry(right_uint).or_insert(0) += 1;
+    }
+    left.sort();
+    right.sort();
+
+    let distance: u32 = left.iter().zip(right).map(|pair| pair.0.abs_diff(pair.1)).sum();
+    let similarity: u32 = left.iter().map(|left_num| similarity.get(left_num).unwrap_or(&0) * left_num).sum();
+    println!("distance: {}", distance);
+    println!("similarity: {}", similarity);
+}
