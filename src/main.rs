@@ -2,12 +2,15 @@ use std::convert::identity;
 use std::io;
 use std::io::BufRead;
 
-fn check_direction(puzzle: &Vec<Vec<char>>, row: usize, col: usize, dx: isize, dy: isize, xmas: &[char]) -> bool {
-    let w = xmas.len();
-    (0..w).all(|i| {
-        let new_row = (row as isize + i as isize * dy) as usize;
-        let new_col = (col as isize + i as isize * dx) as usize;
-        new_row < puzzle.len() && new_col < puzzle[new_row].len() && puzzle[new_row][new_col] == xmas[i]
+fn check_direction(puzzle: &Vec<Vec<char>>, row: isize, col: isize, dx: isize, dy: isize, xmas: &[char]) -> bool {
+    let w = xmas.len() as isize;
+    let half_w = w / 2;
+    ((-half_w)..=(half_w)).all(|i| {
+        let new_row = row + i * dy;
+        let new_col = col + i * dx;
+        new_row >= 0 && new_col >= 0 &&
+            new_row < puzzle.len() as isize && new_col < puzzle[new_row as usize].len() as isize &&
+            puzzle[new_row as usize][new_col as usize] == xmas[(i+half_w) as usize]
     })
 }
 fn main() {
@@ -19,19 +22,24 @@ fn main() {
         let a: Vec<char> = puzzle_line.chars().map(identity).collect();
         puzzle.push(a);
     }
-    let xmas = ['X', 'M', 'A', 'S'];
+    let xmas = ['M', 'A', 'S'];
     for (row, row_val) in puzzle.iter().enumerate() {
         for (col, col_val) in row_val.iter().enumerate() {
-            if *col_val == 'X' {
+            if *col_val == 'A' {
                 xmas_count += (-1..=1).flat_map(|dx| (-1..=1).map(move |dy| (dx, dy)))
-                    .filter(|(dx, dy)| *dx != 0 || *dy != 0)
-                    .map(|(dx, dy)| check_direction(&puzzle, row, col, dx, dy, &xmas))
+                    .filter(|(dx, dy)| *dx != 0 && *dy != 0)
+                    .map(|(dx, dy)|
+                        (check_direction(&puzzle, row as isize, col as isize, dx, dy, &xmas) &&
+                            check_direction(&puzzle, row as isize, col as isize, dx*-1, dy, &xmas)) ||
+                            (check_direction(&puzzle, row as isize, col as isize, dx, dy, &xmas) &&
+                                check_direction(&puzzle, row as isize, col as isize, dx, dy*-1, &xmas))
+                    )
                     .filter(|x| *x)
                     .count();
             }
         }
     }
-    println!("xmas_count: {}", xmas_count);
+    println!("xmas_count: {}", xmas_count/2);
 }
 
 
