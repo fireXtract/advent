@@ -1,96 +1,13 @@
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::io;
 use std::io::BufRead;
-
-fn swap_until_valid(
-    working_page: &mut Vec<i32>,
-    before: &HashMap<i32, Vec<i32>>,
-    after: &HashMap<i32, Vec<i32>>,
-    start: usize,
-) -> bool {
-    // Base case: check if the current permutation is valid
-    for &page in working_page.iter() {
-        if let Err(invalid_page) = is_valid_page2(
-            page,
-            &working_page,
-            before.get(&page).unwrap_or(&vec![]),
-            after.get(&page).unwrap_or(&vec![]),
-        ) {
-            println!("Invalid page found: {}", invalid_page); // Debugging output
-            break;
-        }
-    }
-
-    if working_page.iter().enumerate().all(|(_, &p)| {
-        is_valid_page2(
-            p,
-            &working_page,
-            before.get(&p).unwrap_or(&vec![]),
-            after.get(&p).unwrap_or(&vec![]),
-        )
-            .is_ok()
-    }) {
-        return true;
-    }
-
-    // Generate permutations by swapping elements starting from `start`
-    for i in start..working_page.len() {
-        working_page.swap(start, i); // Swap current index with the starting index
-        if swap_until_valid(working_page, before, after, start + 1) {
-            return true;
-        }
-        working_page.swap(start, i); // Undo the swap
-    }
-
-    false
-}
-
-fn is_valid_page2(
-    page: i32,
-    working_page: &Vec<i32>,
-    after: &Vec<i32>,
-    before: &Vec<i32>,
-) -> Result<(), i32> {
-    // Ensure "before" elements appear before the page
-    for &b in before {
-        if let Some(b_pos) = working_page.iter().position(|&x| x == b) {
-            if let Some(p_pos) = working_page.iter().position(|&x| x == page) {
-                if b_pos > p_pos {
-                    return Err(page); // Return the invalid page
-                }
-            }
-        }
-    }
-
-    // Ensure "after" elements appear after the page
-    for &a in after {
-        if let Some(a_pos) = working_page.iter().position(|&x| x == a) {
-            if let Some(p_pos) = working_page.iter().position(|&x| x == page) {
-                if a_pos < p_pos {
-                    return Err(page); // Return the invalid page
-                }
-            }
-        }
-    }
-
-    Ok(())
-}
-
-fn is_valid_page(page: i32, page_order: &Vec<i32>, before: &Vec<i32>, after: &Vec<i32>) -> bool {
-    let mut p = page_order.split(|x| *x == page);
-    let left = p.next().unwrap_or_default().to_vec();
-    let right = p.next().unwrap_or_default().to_vec();
-    // given v, any element in before[v] must be after v, so not in left
-    // given v, any element in after[v] must before v, so not in right
-    let is_left_invalid = left.iter().any(|l| before.contains(l));
-    let is_right_invalid = right.iter().any(|r| after.contains(r));
-    !(is_left_invalid || is_right_invalid)
-}
-
+static EMPTY_VEC: &Vec<i32> = &Vec::new();
 fn main() {
     let stdin = io::stdin();
     let mut puzzle_lines = stdin.lock().lines();
     let mut middle_sum = 0;
+    let mut fixed_invalid_middle_sum = 0;
     // let mut puzzle: Vec<i32> = Vec::new();
     let mut before: HashMap<i32, Vec<i32>> = HashMap::new();
     let mut after: HashMap<i32, Vec<i32>> = HashMap::new();
@@ -106,9 +23,8 @@ fn main() {
         } else {
             println!("{before:?} {after:?}");
             println!("on {jk}");
-            let page_nums: Vec<i32> = puzzle_line.split(',').flat_map(|r| r.parse::<i32>().ok()).collect();
+            let mut page_nums: Vec<i32> = puzzle_line.split(',').flat_map(|r| r.parse::<i32>().ok()).collect();
             let mut working_page: Vec<i32> = page_nums.clone();
-            let og_valid: Vec<usize> = Vec::new();
             let valid: bool = page_nums.iter().enumerate()
                 .all(|(index, pnum)| {
                     let mut p = page_nums.split(|x| *x == *pnum);
@@ -127,13 +43,20 @@ fn main() {
                 });
             if !valid {
                 println!("not valid {working_page:?}");
-                let is_valid = swap_until_valid(&mut working_page, &before, &after, 0);
-                if is_valid {
-                    println!("fixed it {working_page:?}");
-                    middle_sum += if is_valid { working_page.get(working_page.len() / 2).unwrap_or(&0) } else { &0 };
-                } else {
-                    println!("still invalid {working_page:?}")
-                }
+                page_nums.sort_by(|&a, &b| {
+                    let a_before = before.get(&a).unwrap_or(EMPTY_VEC);
+
+                    // Check if `b` is in `before[a]` (i.e., a should come before b)
+                    if a_before.contains(&b) {
+                        return Ordering::Less;
+                    }
+
+                    Ordering::Equal
+                });
+                println!("fixed it {working_page:?}");
+                fixed_invalid_middle_sum += page_nums.get(page_nums.len() / 2).unwrap_or(&0)
+            } else {
+                middle_sum += page_nums.get(page_nums.len() / 2).unwrap_or(&0)
             }
             jk += 1;
 
@@ -142,6 +65,7 @@ fn main() {
     }
 
     println!("middle_sum: {}", middle_sum);
+    println!("fixed_invalid_middle_sum: {}", fixed_invalid_middle_sum);
 }
 
 
