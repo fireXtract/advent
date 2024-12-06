@@ -1,45 +1,50 @@
-use std::convert::identity;
+use std::collections::HashMap;
 use std::io;
 use std::io::BufRead;
 
-fn check_direction(puzzle: &Vec<Vec<char>>, row: isize, col: isize, dx: isize, dy: isize, xmas: &[char]) -> bool {
-    let w = xmas.len() as isize;
-    let half_w = w / 2;
-    ((-half_w)..=(half_w)).all(|i| {
-        let new_row = row + i * dy;
-        let new_col = col + i * dx;
-        new_row >= 0 && new_col >= 0 &&
-            new_row < puzzle.len() as isize && new_col < puzzle[new_row as usize].len() as isize &&
-            puzzle[new_row as usize][new_col as usize] == xmas[(i+half_w) as usize]
-    })
-}
 fn main() {
     let stdin = io::stdin();
     let mut puzzle_lines = stdin.lock().lines();
-    let mut xmas_count = 0;
-    let mut puzzle: Vec<Vec<char>> = Vec::new();
+    let mut middle_sum = 0;
+    // let mut puzzle: Vec<i32> = Vec::new();
+    let mut before: HashMap<i32, Vec<i32>> = HashMap::new();
+    let mut after: HashMap<i32, Vec<i32>> = HashMap::new();
+    let mut jk = 0;
+    let mut valids: Vec<Vec<&i32>> = Vec::new();
     while let Some(Ok(puzzle_line)) = puzzle_lines.next() {
-        let a: Vec<char> = puzzle_line.chars().map(identity).collect();
-        puzzle.push(a);
-    }
-    let xmas = ['M', 'A', 'S'];
-    for (row, row_val) in puzzle.iter().enumerate() {
-        for (col, col_val) in row_val.iter().enumerate() {
-            if *col_val == 'A' {
-                xmas_count += (-1..=1).flat_map(|dx| (-1..=1).map(move |dy| (dx, dy)))
-                    .filter(|(dx, dy)| *dx != 0 && *dy != 0)
-                    .map(|(dx, dy)|
-                        (check_direction(&puzzle, row as isize, col as isize, dx, dy, &xmas) &&
-                            check_direction(&puzzle, row as isize, col as isize, dx*-1, dy, &xmas)) ||
-                            (check_direction(&puzzle, row as isize, col as isize, dx, dy, &xmas) &&
-                                check_direction(&puzzle, row as isize, col as isize, dx, dy*-1, &xmas))
-                    )
-                    .filter(|x| *x)
-                    .count();
-            }
+        let rule: Vec<i32> = puzzle_line.split('|').flat_map(|r| {
+            // print!("{r} ");
+            r.parse::<i32>().ok()
+        }).collect();
+        if rule.len() > 0 {
+            before.entry(rule[0]).or_insert(Vec::new()).push(rule[1]);
+            after.entry(rule[1]).or_insert(Vec::new()).push(rule[0]);
+        } else {
+            println!("on {jk}");
+            let pages: Vec<i32> = puzzle_line.split(',').flat_map(|r| r.parse::<i32>().ok()).collect();
+            let valid: bool = pages.iter()
+                .all(|v| {
+                    let mut p = pages.split(|x| *x == *v);
+                    let left = p.next().unwrap_or_default().to_vec();
+                    let right = p.next().unwrap_or_default().to_vec();
+                    // given v, all elements in before[v] must be after v, so not in left
+                    // given v, all elements in after[v] must before v, so not in right
+                    let is_left_invalid = left.iter().any(|l| before.get(v).iter().any(|&b| (*b).contains(l)));
+                    let is_right_invalid = right.iter().any(|r| after.get(v).iter().any(|&a| (*a).contains(r)));
+                    if is_left_invalid { print!("!! invalid left"); }
+                    if is_right_invalid { print!("!! invalid right"); }
+                    let pair = (left, right);
+                    println!("{v:?} against {pair:?} {is_left_invalid} {is_right_invalid}");
+
+                    !(is_left_invalid || is_right_invalid)
+                });
+            jk += 1;
+            middle_sum += if valid { pages.get(pages.len() / 2).unwrap_or(&0) } else { &0 };
+            println!("{valid:?}");
         }
     }
-    println!("xmas_count: {}", xmas_count/2);
+
+    println!("middle_sum: {}", middle_sum);
 }
 
 
