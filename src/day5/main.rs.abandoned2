@@ -1,79 +1,26 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io;
 use std::io::BufRead;
 
-fn swap_until_valid(
-    working_page: &mut Vec<i32>,
-    before: &HashMap<i32, Vec<i32>>,
-    after: &HashMap<i32, Vec<i32>>,
-    start: usize,
-) -> bool {
-    // Base case: check if the current permutation is valid
-    for &page in working_page.iter() {
-        if let Err(invalid_page) = is_valid_page2(
-            page,
-            &working_page,
-            before.get(&page).unwrap_or(&vec![]),
-            after.get(&page).unwrap_or(&vec![]),
-        ) {
-            println!("Invalid page found: {}", invalid_page); // Debugging output
-            break;
-        }
-    }
-
-    if working_page.iter().enumerate().all(|(_, &p)| {
-        is_valid_page2(
-            p,
-            &working_page,
-            before.get(&p).unwrap_or(&vec![]),
-            after.get(&p).unwrap_or(&vec![]),
-        )
-            .is_ok()
-    }) {
+fn swap_until_valid(working_page: &mut Vec<i32>, before: &HashMap<i32, Vec<i32>>, after: &HashMap<i32, Vec<i32>>) -> bool {
+    // Base case: all pages are valid
+    println!("{before:?} {after:?}");
+    if working_page.iter().enumerate().all(|(i, p)|
+        is_valid_page(*p, &working_page, before.get(&p).unwrap_or(&Vec::new()), after.get(&p).unwrap_or(&Vec::new()))) {
         return true;
     }
 
-    // Generate permutations by swapping elements starting from `start`
-    for i in start..working_page.len() {
-        working_page.swap(start, i); // Swap current index with the starting index
-        if swap_until_valid(working_page, before, after, start + 1) {
+    // Try swapping adjacent pairs
+    for i in 0..working_page.len() - 1 {
+        working_page.swap(i, i + 1);
+        if swap_until_valid(working_page, before, after) {
             return true;
         }
-        working_page.swap(start, i); // Undo the swap
+        working_page.swap(i, i + 1); // Undo the swap
     }
 
+    // No valid swap found
     false
-}
-
-fn is_valid_page2(
-    page: i32,
-    working_page: &Vec<i32>,
-    after: &Vec<i32>,
-    before: &Vec<i32>,
-) -> Result<(), i32> {
-    // Ensure "before" elements appear before the page
-    for &b in before {
-        if let Some(b_pos) = working_page.iter().position(|&x| x == b) {
-            if let Some(p_pos) = working_page.iter().position(|&x| x == page) {
-                if b_pos > p_pos {
-                    return Err(page); // Return the invalid page
-                }
-            }
-        }
-    }
-
-    // Ensure "after" elements appear after the page
-    for &a in after {
-        if let Some(a_pos) = working_page.iter().position(|&x| x == a) {
-            if let Some(p_pos) = working_page.iter().position(|&x| x == page) {
-                if a_pos < p_pos {
-                    return Err(page); // Return the invalid page
-                }
-            }
-        }
-    }
-
-    Ok(())
 }
 
 fn is_valid_page(page: i32, page_order: &Vec<i32>, before: &Vec<i32>, after: &Vec<i32>) -> bool {
@@ -85,6 +32,44 @@ fn is_valid_page(page: i32, page_order: &Vec<i32>, before: &Vec<i32>, after: &Ve
     let is_left_invalid = left.iter().any(|l| before.contains(l));
     let is_right_invalid = right.iter().any(|r| after.contains(r));
     !(is_left_invalid || is_right_invalid)
+}
+
+fn constraint_based_sort(after: &HashMap<i32, Vec<i32>>, before: &HashMap<i32, Vec<i32>>) -> Vec<i32> {
+    let mut sorted_sequence: Vec<i32> = Vec::new();
+    let mut remaining_elements: HashSet<i32> = before.keys()
+        .chain(after.keys())
+        .cloned()
+        .collect();
+
+    while !remaining_elements.is_empty() {
+        let mut placed = false;
+
+        for &element in remaining_elements.clone().iter() {
+            // Get constraints or fallback to empty slice
+            let before_constraints: &[i32] = before.get(&element).map(|v| &v[..]).unwrap_or(&[]);
+            let after_constraints: &[i32] = after.get(&element).map(|v| &v[..]).unwrap_or(&[]);
+
+            // Check if all constraints are satisfied
+            if before_constraints.iter().all(|&e| sorted_sequence.contains(&e)) {
+                sorted_sequence.push(element);
+                remaining_elements.remove(&element);
+                placed = true;
+                break;
+            } else if after_constraints.iter().all(|&e| sorted_sequence.contains(&e)) {
+                sorted_sequence.insert(0, element);
+                remaining_elements.remove(&element);
+                placed = true;
+                break;
+            }
+        }
+
+        if !placed {
+            // No element can be placed, cycle detected or unsolvable
+            return Vec::new();
+        }
+    }
+
+    sorted_sequence
 }
 
 fn main() {
@@ -127,16 +112,12 @@ fn main() {
                 });
             if !valid {
                 println!("not valid {working_page:?}");
-                let is_valid = swap_until_valid(&mut working_page, &before, &after, 0);
-                if is_valid {
-                    println!("fixed it {working_page:?}");
-                    middle_sum += if is_valid { working_page.get(working_page.len() / 2).unwrap_or(&0) } else { &0 };
-                } else {
-                    println!("still invalid {working_page:?}")
-                }
+                let dag = constraint_based_sort(&before, &after);
+                let filtered:Vec<&i32> = dag.iter().filter(|x|working_page.contains(*x)).collect();
+                println!("dag {dag:?} filtered {filtered:?}")
             }
             jk += 1;
-
+            middle_sum += if valid { page_nums.get(page_nums.len() / 2).unwrap_or(&0) } else { &0 };
             println!("{valid:?}");
         }
     }
