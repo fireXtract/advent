@@ -7,14 +7,14 @@ fn main() {
     let mut puzzle_lines = stdin.lock().lines();
     let mut middle_sum = 0;
     let mut fixed_invalid_middle_sum = 0;
-    let mut before: HashMap<i32, Vec<i32>> = HashMap::new();
+    let mut before: HashMap<usize, Vec<usize>> = HashMap::new();
     while let Some(Ok(puzzle_line)) = puzzle_lines.next() {
-        let rule: Vec<i32> = puzzle_line.split('|')
-            .flat_map(|r| r.parse::<i32>().ok()).collect();
+        let rule: Vec<usize> = puzzle_line.split('|')
+            .flat_map(|r| r.parse::<usize>().ok()).collect();
         if rule.len() > 0 {
             before.entry(rule[0]).or_insert(Vec::new()).push(rule[1]);
         } else {
-            let mut page_nums: Vec<i32> = puzzle_line.split(',').flat_map(|r| r.parse::<i32>().ok()).collect();
+            let mut page_nums: Vec<usize> = puzzle_line.split(',').flat_map(|r| r.parse::<usize>().ok()).collect();
             let valid: bool = page_nums.iter()
                 .all(|page_num|
                     before.get(page_num)
