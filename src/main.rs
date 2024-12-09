@@ -67,85 +67,60 @@ fn main() {
         x = 0;
         starting_map.push(map_row);
     }
-    let mut drop_obstacle_after: isize = isize::MAX;
-    let mut first_drop_obstacle_after: isize = isize::MIN;
-    let mut known_obstacles: Vec<(usize,usize)> = Vec::new();
 
-    'outer: loop {
-        let mut map = starting_map.clone();
-        let (mut guard_pos_x, mut guard_pos_y) = (starting_guard_pos_x, starting_guard_pos_y);
-        let mut visited: Vec<Visited> = Vec::new();
-        let mut visitedmap: HashMap<isize, Vec<Visited>> = HashMap::new();
-
-        let mut drop_after: isize = drop_obstacle_after;
-
-        while is_in_bounds(&guard_pos_x, &guard_pos_y, &bound_x, &bound_y) {
-            let px = guard_pos_x;
-            let py = guard_pos_y;
-            let mut po: Tile = map[guard_pos_y as usize][guard_pos_x as usize];
+    for obstacle_x in 0..bound_x {
+        for obstacle_y in 0..bound_y {
+            let mut map = starting_map.clone();
+            let (mut guard_pos_x, mut guard_pos_y) = (starting_guard_pos_x, starting_guard_pos_y);
+            let mut visited: Vec<Visited> = Vec::new();
+            let mut visitedmap: HashMap<isize, Vec<Visited>> = HashMap::new();
 
 
-            let maybe_obstacle = match po {
-                Tile::GuardUp => move_guard(&mut map, &mut guard_pos_x, &mut guard_pos_y, 0, -1, &bound_x, &bound_y, &mut po, &mut drop_after),
-                Tile::GuardDown => move_guard(&mut map, &mut guard_pos_x, &mut guard_pos_y, 0, 1, &bound_x, &bound_y, &mut po, &mut drop_after),
-                Tile::GuardLeft => move_guard(&mut map, &mut guard_pos_x, &mut guard_pos_y, -1, 0, &bound_x, &bound_y, &mut po, &mut drop_after),
-                Tile::GuardRight => move_guard(&mut map, &mut guard_pos_x, &mut guard_pos_y, 1, 0, &bound_x, &bound_y, &mut po, &mut drop_after),
-                _ => { panic!("illegal position") }
-            };
-            if maybe_obstacle.is_some() {
-                let obstacle = maybe_obstacle.unwrap();
-                if known_obstacles.contains(&obstacle) {
-                    println!("Already tried this obstacle, exiting early {obstacle:?}");
+            while is_in_bounds(&guard_pos_x, &guard_pos_y, &bound_x, &bound_y) {
+                let px = guard_pos_x;
+                let py = guard_pos_y;
+                let mut po: Tile = map[guard_pos_y as usize][guard_pos_x as usize];
+                if map[obstacle_y][obstacle_x] == Tile::None {
+                    map[obstacle_y][obstacle_x] = Tile::ObstacleManual;
+                }
+                match po {
+                    Tile::GuardUp => move_guard(&mut map, &mut guard_pos_x, &mut guard_pos_y, 0, -1, &bound_x, &bound_y, &mut po),
+                    Tile::GuardDown => move_guard(&mut map, &mut guard_pos_x, &mut guard_pos_y, 0, 1, &bound_x, &bound_y, &mut po),
+                    Tile::GuardLeft => move_guard(&mut map, &mut guard_pos_x, &mut guard_pos_y, -1, 0, &bound_x, &bound_y, &mut po),
+                    Tile::GuardRight => move_guard(&mut map, &mut guard_pos_x, &mut guard_pos_y, 1, 0, &bound_x, &bound_y, &mut po),
+                    _ => { panic!("illegal position") }
+                };
+
+                let maybe_visited = Visited {
+                    orientation: po,
+                    x: px,
+                    y: py,
+                };
+
+                if visitedmap.get(&px).map_or(false, |v| v.contains(&maybe_visited)) {
+                    println!("Loop detected! ({},{})", px, py);
+                    distinct_pos += 1;
+                    println!("distinct_pos: {}", distinct_pos);
+                    // for map_row in map {
+                    //     for tile in map_row {
+                    //         print!("{:?}", tile)
+                    //     }
+                    //     println!();
+                    // }
                     break;
                 } else {
-                    println!("Obstacle placed at {obstacle:?}");
-                    known_obstacles.push(obstacle);
+                    visited.push(maybe_visited);
+                    visitedmap.entry(px).or_insert_with(Vec::new).push(maybe_visited);
                 }
             }
-            let maybe_visited = Visited {
-                orientation: po,
-                x: px,
-                y: py,
-            };
-
-            if visitedmap.get(&px).map_or(false, |v| v.contains(&maybe_visited)) {
-                println!("Loop detected! ({},{})", px, py);
-                distinct_pos += 1;
-                println!("distinct_pos: {}", distinct_pos);
-                // for map_row in map {
-                //     for tile in map_row {
-                //         print!("{:?}", tile)
-                //     }
-                //     println!();
-                // }
-                break;
-            } else {
-                visited.push(maybe_visited);
-                visitedmap.entry(px).or_insert_with(Vec::new).push(maybe_visited);
-            }
-        }
 
 
+            println!("bounds ({},{}) last guard pos ({},{}), drop at ({}/{})", bound_x, bound_y, guard_pos_x, guard_pos_y, obstacle_x, obstacle_y);
+            // println!("visited {:?}", visited);
 
-        if first_drop_obstacle_after == isize::MIN {
-            let next_drop_after = visited.len() as isize - 1;
-            first_drop_obstacle_after = next_drop_after;
-            drop_obstacle_after = next_drop_after;
-            for map_row in map {
-                for tile in map_row {
-                    print!("{:?}", tile)
-                }
-                println!();
-            }
-        }
-        drop_obstacle_after -= 1;
-        println!("bounds ({},{}) last guard pos ({},{}), drop at ({}/{})", bound_x, bound_y, guard_pos_x, guard_pos_y, drop_obstacle_after, first_drop_obstacle_after);
-        // println!("visited {:?}", visited);
-
-        if drop_obstacle_after <= 0 {
-            break 'outer;
         }
     }
+
 
     println!("distinct_pos: {}", distinct_pos);
 }
@@ -159,18 +134,12 @@ fn move_guard(map: &mut Vec<Vec<Tile>>,
               guard_pos_x: &mut isize, guard_pos_y: &mut isize,
               dx: isize, dy: isize,
               bound_x: &usize, bound_y: &usize,
-              po: &mut Tile, drop_obstacle_after: &mut isize) -> Option<(usize, usize)> {
+              po: &mut Tile) {
     *po = map[*guard_pos_y as usize][*guard_pos_x as usize];
     map[*guard_pos_y as usize][*guard_pos_x as usize] = Tile::GuardVisited;
     *guard_pos_x += dx;
     *guard_pos_y += dy;
-    let mut obstacle_at: Option<(usize, usize)> = None;
     if is_in_bounds(guard_pos_x, guard_pos_y, bound_x, bound_y) {
-        if *drop_obstacle_after == 0 {
-            map[*guard_pos_y as usize][*guard_pos_x as usize] = Tile::ObstacleManual;
-            obstacle_at = Some((*guard_pos_y as usize, *guard_pos_x as usize));
-        }
-        *drop_obstacle_after -= 1;
         if OBSTACLE.contains(&map[*guard_pos_y as usize][*guard_pos_x as usize]) {
             *guard_pos_x -= dx;
             *guard_pos_y -= dy;
@@ -185,7 +154,6 @@ fn move_guard(map: &mut Vec<Vec<Tile>>,
             map[*guard_pos_y as usize][*guard_pos_x as usize] = *po;
         }
     }
-    obstacle_at
 }
 
 
