@@ -14,3 +14,14 @@ learning Rust together.
 I'm very happy with how day 10 turned out. Day 9 on this computer is incomplete I will fix later.
 
 If you want part 1 solutions you may have to dig through git history.
+
+### Building
+```shell
+cargo build --release
+```
+
+### Measuring
+
+``` shell
+hyperfine --setup 'cargo build --release' --warmup 3 --shell zsh './target/release/advent.exe < ./src/day11/input' 
+```

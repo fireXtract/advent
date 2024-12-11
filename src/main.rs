@@ -19,25 +19,23 @@ fn main() {
 }
 
 fn recurse_blink(stone: u64, depth: u8, cache: &mut HashMap<(u64, u8), u64>) -> u64 {
-    let mut has_key = false;
-    let result = match (stone, depth) {
-        _ if depth == BLINKS => 1,
-        _ if cache.contains_key(&(stone, depth)) => {
-            has_key = true;
-            cache[&(stone, depth)]
-        }
+    if depth == BLINKS { return 1; }
+    let key = (stone, depth);
+    if cache.contains_key(&key) {
+        return cache[&key];
+    }
+    let result = match stone {
         _ if stone == 0 => recurse_blink(1, depth + 1, cache),
-        (v, _) if count_digits(v) % 2 == 0 => {
-            let split_digits = split_number(v);
+        s if count_digits(s) % 2 == 0 => {
+            let split_digits = split_number(s);
             recurse_blink(split_digits.0, depth + 1, cache) + recurse_blink(split_digits.1, depth + 1, cache)
         }
         _ => recurse_blink(stone * 2024, depth + 1, cache)
     };
-    if !has_key { cache.insert((stone, depth), result); };
+    cache.insert(key, result);
     result
 }
 
-#[inline(always)]
 fn count_digits(i: u64) -> u64 {
     let mut count = 1;
     let mut n = i;
@@ -47,7 +45,7 @@ fn count_digits(i: u64) -> u64 {
     }
     count
 }
-#[inline(always)]
+
 fn split_number(i: u64) -> (u64, u64) {
     let digit_count = count_digits(i);
     let half_digits = digit_count / 2;
