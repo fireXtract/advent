@@ -1,0 +1,111 @@
+use std::collections::HashMap;
+use std::io;
+use std::io::BufRead;
+
+#[derive(Eq, PartialEq, Hash, Copy, Clone)]
+struct Coord {
+    x: usize,
+    y: usize,
+}
+
+fn main() {
+    let mut puzzle_sum = 0;
+    let mut puzzle_lines = io::stdin().lock().lines();
+    let mut antennae: HashMap<char, Vec<Coord>> = HashMap::new();
+    let mut antinodes: Vec<Coord> = Vec::new();
+    let mut map: Vec<Vec<char>> = Vec::new();
+    let (mut height, mut width) = (0usize, 0usize);
+    let (mut y, mut x) = (0usize, 0usize);
+    while let Some(Ok(puzzle_line)) = puzzle_lines.next() {
+        x = 0;
+        width = puzzle_line.len();
+        let mut map_row = vec!['.'; width];
+        for c in puzzle_line.chars() {
+            if c != '.' {
+                antennae.entry(c).or_insert(vec![]).push(Coord { x, y });
+                map_row[x] = c;
+            }
+            x += 1;
+        }
+        map.push(map_row);
+        y += 1;
+    }
+    height = map.len();
+    let plain_map =  map.clone();
+    for row in plain_map {
+        for c in row {
+            print!("{c}");
+        }
+        println!();
+    }
+
+    for a in antennae {
+        let c = a.0;
+        let coords = a.1;
+        println!("Considering antenna of type {}", c);
+
+        for i in 0..coords.len() {
+            for j in (i+1)..coords.len() {
+                let antenna_a = coords[i];
+                let antenna_b = coords[j];
+
+
+                place_antinodes(&mut antinodes, &mut height, &mut width, antenna_a, antenna_b, false,false);
+            }
+        }
+    }
+
+    let mut noded_map = map.clone();
+    for antinode in antinodes {
+        if noded_map[antinode.y][antinode.x] != '#' {
+            noded_map[antinode.y][antinode.x] = '#';
+            puzzle_sum += 1;
+        }
+    }
+
+    for row in noded_map {
+        for c in row {
+            if c != '#' && c != '.' {
+                puzzle_sum += 1;
+            }
+            print!("{c}");
+        }
+        println!();
+    }
+
+    println!("puzzle_sum: {}", puzzle_sum);
+}
+
+fn is_in_bounds(x: &isize, y: &isize, width: &usize, height: &usize) -> bool {
+    *x >= 0 && *x < *width as isize && *y >= 0 && *y < *height as isize
+}
+
+fn place_antinodes(antinodes: &mut Vec<Coord>, height: &usize, width: &usize, antenna_a: Coord, antenna_b: Coord, disable_a:bool, disable_b:bool) {
+    let (anti_a_x, anti_b_x) = if antenna_a.x < antenna_b.x {
+        (antenna_a.x as isize - antenna_a.x.abs_diff(antenna_b.x) as isize,
+         antenna_b.x as isize + antenna_a.x.abs_diff(antenna_b.x) as isize)
+    } else {
+        (antenna_a.x as isize + antenna_a.x.abs_diff(antenna_b.x) as isize,
+         antenna_b.x as isize - antenna_a.x.abs_diff(antenna_b.x) as isize)
+    };
+    let (anti_a_y, anti_b_y) = if antenna_a.y < antenna_b.y {
+        (antenna_a.y as isize - antenna_a.y.abs_diff(antenna_b.y) as isize,
+         antenna_b.y as isize + antenna_a.y.abs_diff(antenna_b.y) as isize)
+    } else {
+        (antenna_a.y as isize + antenna_a.y.abs_diff(antenna_b.y) as isize,
+         antenna_b.y as isize - antenna_a.y.abs_diff(antenna_b.y) as isize)
+    };
+    if is_in_bounds(&(anti_a_x), &(anti_a_y), &width, &height) && !disable_a {
+        let antinode_a = Coord { x: anti_a_x as usize, y: anti_a_y as usize };
+        antinodes.push(antinode_a);
+        place_antinodes(antinodes, &height, &width, antenna_a, antinode_a, true, false);
+        // println!("Antinode A at ({anti_a_x},{anti_a_y})")
+    }
+
+    if is_in_bounds(&(anti_b_x), &(anti_b_y), &width, &height) && !disable_b {
+        let antinode_b = Coord { x: anti_b_x as usize, y: anti_b_y as usize };
+        antinodes.push(antinode_b);
+        place_antinodes(antinodes, &height, &width, antenna_b, antinode_b, true, false);
+        // println!("Antinode B at ({anti_b_x},{anti_b_y})")
+    }
+}

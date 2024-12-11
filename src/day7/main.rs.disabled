@@ -1,0 +1,82 @@
+use std::io;
+use std::io::BufRead;
+
+fn generate_permutations(
+    symbols: &[char],
+    length: usize,
+    current: &mut Vec<char>,
+    result: &mut Vec<Vec<char>>,
+) {
+    if current.len() == length {
+        result.push(current.clone());
+        return;
+    }
+
+    for &symbol in symbols {
+        current.push(symbol);
+        generate_permutations(symbols, length, current, result);
+        current.pop(); // backtrack
+    }
+}
+
+fn order_of_magnitude(n: usize) -> usize {
+    if n == 0 {
+        return 1; // Handle case for 0 if needed
+    }
+    10usize.pow((f64::log(n as f64, 10.0).floor() as u32))
+}
+
+const SYMBOLS: [char; 3] = ['+', '*', '|'];
+
+fn main() {
+    let mut puzzle_sum = 0;
+    let mut puzzle_lines = io::stdin().lock().lines();
+    while let Some(Ok(puzzle_line)) = puzzle_lines.next() {
+        let mut calibration_and_remainder = puzzle_line.split(':');
+        let calibration: usize = calibration_and_remainder
+            .next()
+            .map(|c| c.parse::<usize>().unwrap())
+            .unwrap();
+        let og_remainder: Vec<usize> = calibration_and_remainder
+            .next()
+            .map(|r| {
+                r.split_whitespace()
+                    .map(|n| n.parse::<usize>().unwrap())
+                    .collect()
+            })
+            .unwrap();
+        println!("Parsed {}: {:?}", calibration, og_remainder);
+
+        let symbols = SYMBOLS;
+        let mut result = Vec::new();
+        let mut current = Vec::new();
+        let length = og_remainder.len() - 1;
+        generate_permutations(&symbols, length, &mut current, &mut result);
+        println!("Permutations of length {}: {:?}", length, result);
+
+        for permutation in result {
+            let remainder = og_remainder.clone();
+            let mut perm = permutation.iter();
+            if let Some(&initial) = remainder.first() {
+                let result = remainder.iter().skip(1).fold(initial, |acc, &next| {
+                    let next_combine = *perm.next().unwrap();
+                    if next_combine == '+' {
+                        acc + next
+                    } else if next_combine == '*'{
+                        acc * next
+                    } else if next_combine == '|' {
+                        (acc * order_of_magnitude(next) * 10) + next
+                    } else {
+                        panic!("Illegal operator");
+                    }
+                });
+                if result == calibration {
+                    println!("Had a match for {}: {:?} with {:?}", calibration, og_remainder, permutation);
+                    puzzle_sum += calibration;
+                    break;
+                }
+            }
+        }
+    }
+    println!("puzzle_sum: {}", puzzle_sum);
+}
