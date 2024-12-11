@@ -1,126 +1,102 @@
 use std::io;
 use std::io::BufRead;
 
+const TRAIL_HEAD: u8 = 0;
+const TRAIL_PEAK: u8 = 9;
+// (x,y)
+#[derive(Eq, PartialEq, Copy, Clone, Debug)]
+struct Pos(usize, usize);
+
+fn get_neighbor<'a>(
+    trails: &'a Vec<Vec<u8>>,
+    at: &Pos,
+    dx: isize,
+    dy: isize,
+) -> Option<(&'a u8, Pos)> {
+    let new_x = at.0 as isize + dx;
+    let new_y = at.1 as isize + dy;
+    if new_x < 0 || new_y < 0 {
+        return None;
+    }
+
+    let (new_y, new_x) = (new_y as usize, new_x as usize);
+    trails
+        .get(new_y)
+        .and_then(|row| row.get(new_x))
+        .map(|neighbor_val| (neighbor_val, Pos(new_x, new_y)))
+}
+
+
+fn traverse(map: &Vec<Vec<u8>>, path: Vec<Pos>) -> Vec<Vec<Pos>> {
+    let current_pos = path.last().unwrap();
+    let current_val = map[current_pos.1][current_pos.0];
+
+    if current_val == TRAIL_PEAK {
+        return vec![path];
+    }
+    let neighbors = [
+        get_neighbor(map, &current_pos, -1, 0), // left
+        get_neighbor(map, &current_pos, 1, 0),  // right
+        get_neighbor(map, &current_pos, 0, -1), // up
+        get_neighbor(map, &current_pos, 0, 1),  // down
+    ];
+    let mut paths: Vec<Vec<Pos>> = vec![];
+    for &(&value, pos) in neighbors.iter().flatten() {
+        if value == current_val + 1 {
+            let mut new_path = path.clone();
+            new_path.push(pos);
+
+            let next_paths = traverse(map, new_path);
+            paths.extend(next_paths);
+        }
+    }
+
+    paths
+}
+
 fn main() {
-    const RADIX: u32 = 10;
-    let stdin = io::stdin();
-    let mut puzzle_lines = stdin.lock().lines();
-    let mut id: isize = 0isize;
-    let mut filesystem: Vec<isize> = Vec::new();
-    while let Some(Ok(disk_map)) = puzzle_lines.next() {
-        let mut is_file = true;
-        for x in disk_map.chars() {
-            for _ in 0..x.to_digit(RADIX).unwrap() {
-                if is_file {
-                    filesystem.push(id);
-                } else {
-                    filesystem.push(-1);
-                }
+    let mut puzzle_lines = io::stdin().lock().lines();
+    let mut map: Vec<Vec<u8>> = vec![];
+    let mut trail_heads: Vec<Pos> = vec![];
+    let (mut x, mut y) = (0usize, 0usize);
+    while let Some(Ok(puzzle_line)) = puzzle_lines.next() {
+        let mut map_row: Vec<u8> = vec![];
+        for c in puzzle_line.chars() {
+            let z = c.to_digit(10).unwrap() as u8;
+            if z == TRAIL_HEAD {
+                trail_heads.push(Pos(x, y));
             }
-            if is_file {
-                id += 1;
+            map_row.push(z);
+            x += 1;
+        }
+        map.push(map_row);
+        y += 1;
+        x = 0;
+    }
+
+    let mut score_pt1 = 0;
+    let mut score_pt2 = 0;
+    for trail_head in trail_heads {
+        let trails_to_peak = traverse(&map, vec![trail_head]);
+        let mut seen_peaks: Vec<Pos> = vec![];
+        for trail in trails_to_peak {
+            let trail_peak = trail.last().unwrap();
+            if !seen_peaks.contains(trail_peak) {
+                // print!("uniq: ");
+                seen_peaks.push(*trail_peak);
+                score_pt1 += 1;
             }
-            is_file = !is_file;
+            score_pt2 += 1;
+            // println!("{trail:?}");
         }
     }
 
-    let og_filesystem = filesystem.clone();
-    for c in og_filesystem {
-        if c == -1 {
-            print!(".");
-        } else {
-            if c > 9 {
-                print!("({c})");
-            } else {
-                print!("{c}");
-            }
-        }
-    }
-    println!();
-
-    let mut left_idx = 0usize;
-    let mut right_idx = filesystem.len() - 1;
-    let mut seen_ids: Vec<isize> = Vec::new();
-    while seen_ids.len() <= id as usize + 1  {
-        print!("({left_idx}<{right_idx})");
-        let mut left_val = filesystem[left_idx];
-        if left_val == -1 {
-            let right_val = filesystem[right_idx];
-            if right_val != -1 {
-                print!("(c{right_val})");
-                if !seen_ids.contains(&right_val) {
-                    // traverse all padding for this current block
-                    let block_width = match_length(&filesystem, right_idx, right_val, -1);
-                    println!("block width of {right_val} was {block_width}");
-                    while left_idx < right_idx {
-                        left_val = filesystem[left_idx];
-                        if left_val == -1 {
-                            let padding_width = match_length(&filesystem, left_idx, -1, 1);
-                            if padding_width >= block_width {
-                                println!("c{right_val} fits at {left_idx} bc {padding_width}>{block_width}");
-                                for j in 0..block_width {
-                                    println!("{j} swapping");
-                                    filesystem.swap(left_idx + j, right_idx - j);
-                                }
-                                left_idx = 0;
-                                right_idx -= block_width;
-                                seen_ids.push(right_val);
-                            } else {
-                                println!("c{right_val} padding at {left_idx} didn't fit");
-                                left_idx += 1
-                            }
-                        } else {
-                            left_idx += 1;
-                        }
-                    }
-                    if !seen_ids.contains(&right_val) {seen_ids.push(right_val);}
-                    left_idx = 0;
-                    right_idx = filesystem.len()-1;
-                } else {
-                    right_idx -= 1;
-                }
-            } else {
-                right_idx -= 1;
-            }
-        } else {
-            left_idx += 1;
-        }
-    }
-    println!("swapping done");
-    let swapped = filesystem.clone();
-    for c in swapped {
-        if c == -1 {
-            print!(".");
-        } else {
-            if c > 9 {
-                print!("({c})");
-            } else {
-                print!("{c}");
-            }
-        }
-    }
-    println!();
-    let distinct_pos = filesystem.iter().enumerate()
-        .filter(|(_, &i)| i >= 0)
-        .fold(0, |acc, (idx, &val)|
-            acc + (idx * val as usize),
-        );
-
-    // println!("{filesystem:?}");
-
-
-    println!("distinct_pos: {}", distinct_pos);
+    // for row in map {
+    //     for val in row {
+    //         print!("{val}");
+    //     }
+    //     println!();
+    // }
+    println!("score_pt1: {score_pt1}");
+    println!("score_pt2: {score_pt2}");
 }
-
-fn match_length(vec: &Vec<isize>, start_pos: usize, match_value: isize, direction: isize) -> usize {
-    let mut current_pos = start_pos as isize;
-    let mut match_len = 0;
-
-    while 0 <= current_pos && current_pos < vec.len() as isize && vec[current_pos as usize] == match_value {
-        match_len += 1;
-        current_pos += direction;
-    }
-
-    match_len
-}
-

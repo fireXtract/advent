@@ -1,4 +1,4 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env bash
 
 awk '{ print $1 }' <input | sort -n >leftside
 awk '{ print $2 }' <input | sort -n >rightside
