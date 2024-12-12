@@ -17,7 +17,7 @@ fn main() {
     while let Some(Ok(puzzle_line)) = puzzle_lines.next() {
         let mut is_file = true;
         for c in puzzle_line.chars() {
-            // print!("{c}");
+            print!("{c}");
             let length = c.to_digit(10).unwrap() as usize;
             let f_idx = idx;
             if is_file {
@@ -33,6 +33,20 @@ fn main() {
             is_file = !is_file;
         }
     }
+    println!();
+    println!("{files:?}");
+    let parsed_files = files.clone();
+    for file in parsed_files {
+        for _ in 0..file.length {
+            if file.id == -1 {
+                print!(".");
+            }else if file.id > 9 {
+                print!("({})", file.id);
+            } else {
+                print!("{}", file.id);
+            }
+        }
+    }
 
     let mut considering_id = id - 1;
     while considering_id > 0  {
@@ -42,6 +56,7 @@ fn main() {
             let left_file = &files[left_idx];
             if left_file.id == -1 {
                 let right_file = &files[right_idx];
+                println!("considering {considering_id} ({left_idx}<{right_idx})");
                 if right_file.id == considering_id {
                     let padding_width = left_file.length;
                     let block_width = right_file.length;
@@ -49,6 +64,7 @@ fn main() {
                         let leftover_padding = padding_width - block_width;
                         let original_padding_idx = left_file.idx;
                         let original_block_idx = right_file.idx;
+                        println!("swapping");
                         files.swap(left_idx, right_idx);
                         files[left_idx].idx = original_padding_idx;
                         files[right_idx].idx = original_block_idx;
@@ -70,18 +86,21 @@ fn main() {
         considering_id -= 1;
     }
 
-    // println!();
+    println!("{files:?}");
     let mut checksum = 0;
+    let mut sanity_check = 0;
     for file in files {
+        assert_eq!(sanity_check, file.idx);
+        sanity_check += file.length;
         for i in 0..file.length {
             if file.id == -1 {
-                // print!(".");
+                print!(".");
             }else if file.id > 9 {
                 checksum += file.id * (file.idx + i) as isize;
-                // print!("({})", file.id);
+                print!("({})", file.id);
             } else {
                 checksum += file.id * (file.idx + i) as isize;
-                // print!("{}", file.id);
+                print!("{}", file.id);
             }
         }
     }
