@@ -1,7 +1,6 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::io;
 use std::io::BufRead;
-use std::ops::Add;
 
 // (x,y)
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
@@ -42,7 +41,7 @@ fn get_neighbor<'a>(
 // neighbor up
 // horizontals 0, 1
 // verticals 1, 2
-fn traverse(map: &Vec<Vec<char>>, current_pos: Pos, verticals: &mut HashMap<usize,isize>, horizontals: &mut HashMap<usize,isize>, visited_pos: &mut Vec<Pos>) -> (usize, usize) {
+fn traverse(map: &Vec<Vec<char>>, current_pos: Pos, verticals: &mut HashMap<usize, isize>, horizontals: &mut HashMap<usize, isize>, visited_pos: &mut Vec<Pos>) -> (usize, usize) {
     let current_val = map[current_pos.1][current_pos.0];
     if visited_pos.contains(&current_pos) {
         return (0, 0);
@@ -58,35 +57,46 @@ fn traverse(map: &Vec<Vec<char>>, current_pos: Pos, verticals: &mut HashMap<usiz
     horizontals.entry(top_horizontal).and_modify(|v| *v += 1).or_insert(1);
     horizontals.entry(bottom_horizontal).and_modify(|v| *v += 1).or_insert(1);
 
-    println!("{verticals:?}");
+    // println!("{verticals:?}");
     let left = get_neighbor(map, &current_pos, -1, 0); // left
     let right = get_neighbor(map, &current_pos, 1, 0);  // right
     let up = get_neighbor(map, &current_pos, 0, -1); // up
     let down = get_neighbor(map, &current_pos, 0, 1);  // down
     let mut area = 1;
-    let mut perimeter = 4;
-
+    let mut perimeter = 0;
+    let mut had_left_match = false;
+    let mut had_right_match = false;
+    let mut had_up_match = false;
+    let mut had_down_match = false;
     if let Some((&value, pos)) = left {
         if value == current_val {
-            perimeter -= 1;
+            had_left_match = true;
             let next_paths = traverse(map, pos, verticals, horizontals, visited_pos);
-            verticals.entry(pos.0 +1).and_modify(|v| *v -= 2);
+            verticals.entry(pos.0 + 1).and_modify(|v| *v -= 2);
             area += next_paths.0;
             perimeter += next_paths.1;
         }
     }
     if let Some((&value, pos)) = right {
         if value == current_val {
-            perimeter -= 1;
+            had_right_match = true;
             let next_paths = traverse(map, pos, verticals, horizontals, visited_pos);
             verticals.entry(pos.0).and_modify(|v| *v -= 2);
             area += next_paths.0;
             perimeter += next_paths.1;
+        } else {
+            if let Some((&up_right,_)) = get_neighbor(map, &current_pos, 1, -1) {
+                if let Some((&down_right,_)) = get_neighbor(map, &current_pos, 1, 1) {
+                    if current_val == up_right && current_val == down_right {
+                        perimeter += 1;
+                    }
+                }
+            }
         }
     }
     if let Some((&value, pos)) = up {
         if value == current_val {
-            perimeter -= 1;
+            had_up_match = true;
             let next_paths = traverse(map, pos, verticals, horizontals, visited_pos);
             horizontals.entry(current_pos.1).and_modify(|v| *v -= 2);
             area += next_paths.0;
@@ -95,7 +105,7 @@ fn traverse(map: &Vec<Vec<char>>, current_pos: Pos, verticals: &mut HashMap<usiz
     }
     if let Some((&value, pos)) = down {
         if value == current_val {
-            perimeter -= 1;
+            had_down_match = true;
             let next_paths = traverse(map, pos, verticals, horizontals, visited_pos);
             horizontals.entry(pos.1).and_modify(|v| *v -= 2);
             area += next_paths.0;
@@ -103,7 +113,20 @@ fn traverse(map: &Vec<Vec<char>>, current_pos: Pos, verticals: &mut HashMap<usiz
         }
     }
 
-    println!("({current_val}) area was {area} and perimeter was {perimeter}");
+
+    if (had_up_match && had_down_match) || (had_left_match && had_right_match) {
+        // no perimeter
+    } else {
+        if !had_left_match && !had_up_match {
+            perimeter += 2;
+        }
+        if !had_right_match && !had_down_match {
+            perimeter += 2;
+        }
+    }
+
+
+    println!("({current_val})({current_pos:?}) area was {area} and perimeter was {perimeter}");
     (area, perimeter)
 }
 
@@ -122,18 +145,19 @@ fn main() {
     let mut price = 0;
     let (mut x, mut y) = (0usize, 0usize);
     while visited_pos.len() < total_positions {
-        let mut verticals: HashMap<usize,isize> = HashMap::new();
-        let mut horizontals: HashMap<usize,isize> = HashMap::new();
-        let (area, _) = traverse(&garden_plots, Pos(x, y), &mut verticals, &mut horizontals, &mut visited_pos);
+        let mut verticals: HashMap<usize, isize> = HashMap::new();
+        let mut horizontals: HashMap<usize, isize> = HashMap::new();
+        let (area, perimeter) = traverse(&garden_plots, Pos(x, y), &mut verticals, &mut horizontals, &mut visited_pos);
         let sides = horizontals.values().filter(|&v| *v > 0).count() + verticals.values().filter(|&v| *v > 0).count();
-        price += area * sides;
+        let new_price = area * perimeter;
+        println!("new_price: {new_price}");
+        price += new_price;
         x += 1;
         if x >= width {
             y += 1;
             x = 0;
         }
     }
-
 
 
     println!("price: {price}");
