@@ -44,13 +44,11 @@ fn solve(machine: Machine) -> Option<(usize, usize)> {
 fn parse_prize_line(line: String) -> Option<(usize, usize)> {
     let chars = line.chars().skip(8);
 
-    // Find the start and end of the X value
     let x_start = 0;
     let x_end = chars.clone().skip(x_start + 1).position(|c| c == ',')?;
     let x_str: String = chars.clone().skip(x_start + 1).take(x_end).collect();
     let x = x_str.parse::<usize>().ok()?;
 
-    // Find the start of the Y value
     let y_start = chars.clone().skip(x_start + x_end + 2).position(|c| c == '=')?;
     let y_str: String = chars.skip(x_start + x_end + y_start + 3).collect();
     let y = y_str.parse::<usize>().ok()?;
@@ -79,7 +77,6 @@ fn main() {
             let (x, y) = parse_prize_line(puzzle_line).unwrap();
             machine.prize = Pos(x, y);
 
-            // println!("{machine:?}");
             if let Some((a, b)) = solve(machine) {
                 let cost = (a * A_COST) + (b * B_COST);
                 score_p1 += cost;
