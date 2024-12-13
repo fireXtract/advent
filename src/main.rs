@@ -3,8 +3,31 @@ use std::io;
 use std::io::BufRead;
 
 // (x,y)
-#[derive(Eq, PartialEq, Copy, Clone, Debug)]
+#[derive(Eq, PartialEq, Copy, Clone, Debug, Hash)]
 struct Pos(usize, usize);
+
+impl Pos {
+    fn top_left(&self) -> Pos {
+        Pos(self.0, self.1)
+    }
+    fn top_right(&self) -> Pos {
+        Pos(self.0 + 1, self.1)
+    }
+    fn bottom_left(&self) -> Pos {
+        Pos(self.0, self.1 + 1)
+    }
+    fn bottom_right(&self) -> Pos {
+        Pos(self.0 + 1, self.1 + 1)
+    }
+    fn corners(&self) -> [Pos; 4] {
+        [
+            self.top_left(),
+            self.top_right(),
+            self.bottom_left(),
+            self.bottom_right(),
+        ]
+    }
+}
 
 fn get_neighbor<'a>(
     trails: &'a Vec<Vec<char>>,
@@ -25,108 +48,44 @@ fn get_neighbor<'a>(
         .map(|neighbor_val| (neighbor_val, Pos(new_x, new_y)))
 }
 
-
-// area * perimeter
-// at 0,0 with no neighbors, we'd have verticals at 0,1, and horizontals at 0,1
-// 0 -> 0, 1
-// 1 -> 1, 2
-// 2 -> 3, 4
-// 3 -> 5, 6
-// 4 -> 7, 8
-// verticals (x, x+1) are | |
-// horizontals (y, y+1) are --
-// (1,1)
-//horizontals 1,2
-//verticals 1,2
-// neighbor up
-// horizontals 0, 1
-// verticals 1, 2
-fn traverse(map: &Vec<Vec<char>>, current_pos: Pos, verticals: &mut HashMap<usize, isize>, horizontals: &mut HashMap<usize, isize>, visited_pos: &mut Vec<Pos>) -> (usize, usize) {
-    let current_val = map[current_pos.1][current_pos.0];
-    if visited_pos.contains(&current_pos) {
+fn traverse(
+    map: &Vec<Vec<char>>,
+    c_pos: Pos,
+    corners: &mut HashMap<Pos, Vec<Pos>>,
+    visited_pos: &mut Vec<Pos>,
+) -> (usize, usize) {
+    let current_val = map[c_pos.1][c_pos.0];
+    if visited_pos.contains(&c_pos) {
         return (0, 0);
     } else {
-        visited_pos.push(current_pos);
+        visited_pos.push(c_pos);
     }
-    let left_vertical = current_pos.0;
-    let right_vertical = current_pos.0 + 1;
-    let top_horizontal = current_pos.1;
-    let bottom_horizontal = current_pos.1 + 1;
-    verticals.entry(left_vertical).and_modify(|v| *v += 1).or_insert(1);
-    verticals.entry(right_vertical).and_modify(|v| *v += 1).or_insert(1);
-    horizontals.entry(top_horizontal).and_modify(|v| *v += 1).or_insert(1);
-    horizontals.entry(bottom_horizontal).and_modify(|v| *v += 1).or_insert(1);
 
-    // println!("{verticals:?}");
-    let left = get_neighbor(map, &current_pos, -1, 0); // left
-    let right = get_neighbor(map, &current_pos, 1, 0);  // right
-    let up = get_neighbor(map, &current_pos, 0, -1); // up
-    let down = get_neighbor(map, &current_pos, 0, 1);  // down
+    c_pos.corners().iter().for_each(|corner| {
+        corners
+            .entry(*corner)
+            .and_modify(|v| v.push(c_pos))
+            .or_insert(vec![c_pos]);
+    });
+
+    let neighbors = [
+        get_neighbor(map, &c_pos, -1, 0),// left
+        get_neighbor(map, &c_pos, 1, 0), // right
+        get_neighbor(map, &c_pos, 0, -1),// up
+        get_neighbor(map, &c_pos, 0, 1), // down
+    ];
     let mut area = 1;
-    let mut perimeter = 0;
-    let mut had_left_match = false;
-    let mut had_right_match = false;
-    let mut had_up_match = false;
-    let mut had_down_match = false;
-    if let Some((&value, pos)) = left {
+    let mut perimeter = 4;
+
+    for &(&value, pos) in neighbors.iter().flatten() {
         if value == current_val {
-            had_left_match = true;
-            let next_paths = traverse(map, pos, verticals, horizontals, visited_pos);
-            verticals.entry(pos.0 + 1).and_modify(|v| *v -= 2);
-            area += next_paths.0;
-            perimeter += next_paths.1;
-        }
-    }
-    if let Some((&value, pos)) = right {
-        if value == current_val {
-            had_right_match = true;
-            let next_paths = traverse(map, pos, verticals, horizontals, visited_pos);
-            verticals.entry(pos.0).and_modify(|v| *v -= 2);
-            area += next_paths.0;
-            perimeter += next_paths.1;
-        } else {
-            if let Some((&up_right,_)) = get_neighbor(map, &current_pos, 1, -1) {
-                if let Some((&down_right,_)) = get_neighbor(map, &current_pos, 1, 1) {
-                    if current_val == up_right && current_val == down_right {
-                        perimeter += 1;
-                    }
-                }
-            }
-        }
-    }
-    if let Some((&value, pos)) = up {
-        if value == current_val {
-            had_up_match = true;
-            let next_paths = traverse(map, pos, verticals, horizontals, visited_pos);
-            horizontals.entry(current_pos.1).and_modify(|v| *v -= 2);
-            area += next_paths.0;
-            perimeter += next_paths.1;
-        }
-    }
-    if let Some((&value, pos)) = down {
-        if value == current_val {
-            had_down_match = true;
-            let next_paths = traverse(map, pos, verticals, horizontals, visited_pos);
-            horizontals.entry(pos.1).and_modify(|v| *v -= 2);
+            perimeter -= 1;
+            let next_paths = traverse(map, pos, corners, visited_pos);
             area += next_paths.0;
             perimeter += next_paths.1;
         }
     }
 
-
-    if (had_up_match && had_down_match) || (had_left_match && had_right_match) {
-        // no perimeter
-    } else {
-        if !had_left_match && !had_up_match {
-            perimeter += 2;
-        }
-        if !had_right_match && !had_down_match {
-            perimeter += 2;
-        }
-    }
-
-
-    println!("({current_val})({current_pos:?}) area was {area} and perimeter was {perimeter}");
     (area, perimeter)
 }
 
@@ -142,16 +101,47 @@ fn main() {
     let total_positions = width * height;
     let mut visited_pos: Vec<Pos> = vec![];
 
-    let mut price = 0;
+    let mut price_p1 = 0;
+    let mut price_p2 = 0;
     let (mut x, mut y) = (0usize, 0usize);
     while visited_pos.len() < total_positions {
-        let mut verticals: HashMap<usize, isize> = HashMap::new();
-        let mut horizontals: HashMap<usize, isize> = HashMap::new();
-        let (area, perimeter) = traverse(&garden_plots, Pos(x, y), &mut verticals, &mut horizontals, &mut visited_pos);
-        let sides = horizontals.values().filter(|&v| *v > 0).count() + verticals.values().filter(|&v| *v > 0).count();
-        let new_price = area * perimeter;
-        println!("new_price: {new_price}");
-        price += new_price;
+        let mut corners: HashMap<Pos, Vec<Pos>> = HashMap::new();
+        let (area, perimeter) = traverse(&garden_plots, Pos(x, y), &mut corners, &mut visited_pos);
+        price_p1 += area * perimeter;
+        let mut sides = 0;
+        for v in corners.values() {
+            let mut sum = 0;
+            let mut at = 0;
+            let l = v.len();
+            let mut corner_case = false;
+            if l > 1 {
+                while at < l {
+                    for i in 0..l {
+                        if i != at {
+                            if  l == 2 && (v[i].0 != v[at].0 && v[i].1 != v[at].1) {
+                                corner_case = true;
+                            }
+                            if v[i].0 == v[at].0 || v[i].1 == v[at].1{
+                                sum += 1;
+                                break;
+                            }
+                        }
+                    }
+                    at +=1;
+                }
+            } else {
+                sum = 1;
+            }
+            if corner_case {
+                sides += 2;
+                continue;
+            }
+            if sum % 2 == 1 {
+                sides += 1;
+            }
+
+        }
+        price_p2 += area * sides;
         x += 1;
         if x >= width {
             y += 1;
@@ -159,10 +149,6 @@ fn main() {
         }
     }
 
-
-    println!("price: {price}");
-    // price of regions fence = area * perimeter
-    // total price = sum of prices of region fences
+    println!("price_p1: {price_p1}");
+    println!("price_p2: {price_p2}");
 }
-
-
