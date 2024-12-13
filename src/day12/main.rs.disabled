@@ -90,17 +90,65 @@ fn traverse(
 }
 
 fn main() {
-    let mut score_p1 = 0;
-    let mut score_p2 = 0;
     let mut puzzle_lines = io::stdin().lock().lines();
-    let mut map: Vec<Vec<char>> = vec![];
+    let mut garden_plots: Vec<Vec<char>> = vec![];
     while let Some(Ok(puzzle_line)) = puzzle_lines.next() {
         let garden_row: Vec<char> = puzzle_line.chars().collect();
-        map.push(garden_row);
+        garden_plots.push(garden_row);
     }
-    let width = map[0].len();
-    let height = map.len();
+    let width = garden_plots[0].len();
+    let height = garden_plots.len();
+    let total_positions = width * height;
+    let mut visited_pos: Vec<Pos> = vec![];
 
-    println!("score_p1: {score_p1}");
-    println!("score_p2: {score_p2}");
+    let mut price_p1 = 0;
+    let mut price_p2 = 0;
+    let (mut x, mut y) = (0usize, 0usize);
+    while visited_pos.len() < total_positions {
+        let mut corners: HashMap<Pos, Vec<Pos>> = HashMap::new();
+        let (area, perimeter) = traverse(&garden_plots, Pos(x, y), &mut corners, &mut visited_pos);
+        price_p1 += area * perimeter;
+        let mut sides = 0;
+        for v in corners.values() {
+            let mut sum = 0;
+            let mut at = 0;
+            let l = v.len();
+            let mut corner_case = false;
+            if l > 1 {
+                while at < l {
+                    for i in 0..l {
+                        if i != at {
+                            if  l == 2 && (v[i].0 != v[at].0 && v[i].1 != v[at].1) {
+                                corner_case = true;
+                            }
+                            if v[i].0 == v[at].0 || v[i].1 == v[at].1{
+                                sum += 1;
+                                break;
+                            }
+                        }
+                    }
+                    at +=1;
+                }
+            } else {
+                sum = 1;
+            }
+            if corner_case {
+                sides += 2;
+                continue;
+            }
+            if sum % 2 == 1 {
+                sides += 1;
+            }
+
+        }
+        price_p2 += area * sides;
+        x += 1;
+        if x >= width {
+            y += 1;
+            x = 0;
+        }
+    }
+
+    println!("price_p1: {price_p1}");
+    println!("price_p2: {price_p2}");
 }
