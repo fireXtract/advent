@@ -2,7 +2,7 @@ use std::io;
 use std::io::BufRead;
 
 // (x,y)
-#[derive(Eq, PartialEq, Copy, Clone, Debug, Hash, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 struct Pos(usize, usize);
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -12,11 +12,11 @@ struct Machine {
     b: Pos,
 }
 
-const MAX_PRESSES: usize = 100;
 const A_COST: usize = 3;
 const B_COST: usize = 1;
 
 // elimination method
+#[inline(always)]
 fn solve(machine: Machine) -> Option<(usize, usize)> {
     let a1 = machine.a.0 as f64;
     let a2 = machine.a.1 as f64;
@@ -40,12 +40,30 @@ fn solve(machine: Machine) -> Option<(usize, usize)> {
     Some((a_cast, b_cast))
 }
 
+#[inline(always)]
+fn parse_prize_line(line: String) -> Option<(usize, usize)> {
+    let chars = line.chars().skip(8);
+
+    // Find the start and end of the X value
+    let x_start = 0;
+    let x_end = chars.clone().skip(x_start + 1).position(|c| c == ',')?;
+    let x_str: String = chars.clone().skip(x_start + 1).take(x_end).collect();
+    let x = x_str.parse::<usize>().ok()?;
+
+    // Find the start of the Y value
+    let y_start = chars.clone().skip(x_start + x_end + 2).position(|c| c == '=')?;
+    let y_str: String = chars.skip(x_start + x_end + y_start + 3).collect();
+    let y = y_str.parse::<usize>().ok()?;
+
+    Some((x, y))
+}
+
+
 fn main() {
     let mut score_p1 = 0;
     let mut score_p2 = 0;
     let mut puzzle_lines = io::stdin().lock().lines();
     let mut machine: Machine = Machine::default();
-    let re = regex::Regex::new(r"X=(\d+), Y=(\d+)").unwrap();
     while let Some(Ok(puzzle_line)) = puzzle_lines.next() {
         if puzzle_line.starts_with("Button A:") {
             let x = puzzle_line.get(12..14).unwrap().parse::<usize>().unwrap();
@@ -58,11 +76,10 @@ fn main() {
             machine.b = Pos(x, y);
         }
         if puzzle_line.starts_with("Prize:") {
-            let caps = re.captures(&*puzzle_line).unwrap();
-            let x = caps.get(1).unwrap().as_str().parse::<usize>().unwrap();
-            let y = caps.get(2).unwrap().as_str().parse::<usize>().unwrap();
+            let (x, y) = parse_prize_line(puzzle_line).unwrap();
             machine.prize = Pos(x, y);
 
+            // println!("{machine:?}");
             if let Some((a, b)) = solve(machine) {
                 let cost = (a * A_COST) + (b * B_COST);
                 score_p1 += cost;
