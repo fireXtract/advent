@@ -1,12 +1,11 @@
-use std::collections::{HashSet, LinkedList};
 use std::io;
 use std::io::BufRead;
 
 // (x,y)
-#[derive(Eq, PartialEq, Copy, Clone, Debug, Hash)]
+#[derive(Eq, PartialEq, Copy, Clone, Debug, Hash, Default)]
 struct Pos(usize, usize);
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 struct Machine {
     prize: Pos,
     a: Pos,
@@ -18,7 +17,7 @@ const A_COST: usize = 3;
 const B_COST: usize = 1;
 
 // elimination method
-fn solve_alt(machine: Machine) -> Option<(usize, usize)> {
+fn solve(machine: Machine) -> Option<(usize, usize)> {
     let a1 = machine.a.0 as f64;
     let a2 = machine.a.1 as f64;
     let b1 = machine.b.0 as f64;
@@ -45,39 +44,35 @@ fn main() {
     let mut score_p1 = 0;
     let mut score_p2 = 0;
     let mut puzzle_lines = io::stdin().lock().lines();
-    let mut machine_id = 0usize;
-    let mut machines: Vec<Machine> = vec![];
+    let mut machine: Machine = Machine::default();
     let re = regex::Regex::new(r"X=(\d+), Y=(\d+)").unwrap();
     while let Some(Ok(puzzle_line)) = puzzle_lines.next() {
         if puzzle_line.starts_with("Button A:") {
             let x = puzzle_line.get(12..14).unwrap().parse::<usize>().unwrap();
             let y = puzzle_line.get(18..20).unwrap().parse::<usize>().unwrap();
-            machines.push(Machine { prize: Pos(0, 0), a: Pos(x, y), b: Pos(0, 0) });
+            machine = Machine { prize: Pos(0, 0), a: Pos(x, y), b: Pos(0, 0) };
         }
         if puzzle_line.starts_with("Button B:") {
             let x = puzzle_line.get(12..14).unwrap().parse::<usize>().unwrap();
             let y = puzzle_line.get(18..20).unwrap().parse::<usize>().unwrap();
-            machines[machine_id].b = Pos(x, y);
+            machine.b = Pos(x, y);
         }
         if puzzle_line.starts_with("Prize:") {
             let caps = re.captures(&*puzzle_line).unwrap();
             let x = caps.get(1).unwrap().as_str().parse::<usize>().unwrap();
             let y = caps.get(2).unwrap().as_str().parse::<usize>().unwrap();
-            machines[machine_id].prize = Pos(x, y);
-            machine_id += 1;
-        }
-    }
-    for machine in machines {
-        if let Some((a, b)) = solve_alt(machine) {
-            let cost = (a * A_COST) + (b * B_COST);
-            score_p1 += cost;
-        }
-        let mut unit_converted_machine = machine.clone();
-        unit_converted_machine.prize.0 += 10000000000000;
-        unit_converted_machine.prize.1 += 10000000000000;
-        if let Some((a, b)) = solve_alt(unit_converted_machine) {
-            let cost = (a * A_COST) + (b * B_COST);
-            score_p2 += cost;
+            machine.prize = Pos(x, y);
+
+            if let Some((a, b)) = solve(machine) {
+                let cost = (a * A_COST) + (b * B_COST);
+                score_p1 += cost;
+            }
+            machine.prize.0 += 10000000000000;
+            machine.prize.1 += 10000000000000;
+            if let Some((a, b)) = solve(machine) {
+                let cost = (a * A_COST) + (b * B_COST);
+                score_p2 += cost;
+            }
         }
     }
 
