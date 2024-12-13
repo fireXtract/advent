@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashSet, LinkedList};
 use std::io;
 use std::io::BufRead;
 
@@ -6,100 +6,80 @@ use std::io::BufRead;
 #[derive(Eq, PartialEq, Copy, Clone, Debug, Hash)]
 struct Pos(usize, usize);
 
-impl Pos {
-    fn top_left(&self) -> Pos {
-        Pos(self.0, self.1)
-    }
-    fn top_right(&self) -> Pos {
-        Pos(self.0 + 1, self.1)
-    }
-    fn bottom_left(&self) -> Pos {
-        Pos(self.0, self.1 + 1)
-    }
-    fn bottom_right(&self) -> Pos {
-        Pos(self.0 + 1, self.1 + 1)
-    }
-    fn corners(&self) -> [Pos; 4] {
-        [
-            self.top_left(),
-            self.top_right(),
-            self.bottom_left(),
-            self.bottom_right(),
-        ]
-    }
+#[derive(Debug, Clone, Copy)]
+struct Machine {
+    prize: Pos,
+    a: Pos,
+    b: Pos,
 }
 
-fn get_neighbor<'a>(
-    trails: &'a Vec<Vec<char>>,
-    at: &Pos,
-    dx: isize,
-    dy: isize,
-) -> Option<(&'a char, Pos)> {
-    let new_x = at.0 as isize + dx;
-    let new_y = at.1 as isize + dy;
-    if new_x < 0 || new_y < 0 {
+const MAX_PRESSES: usize = 100;
+const A_COST: usize = 3;
+const B_COST: usize = 1;
+
+// elimination method
+fn solve_alt(machine: Machine) -> Option<(usize, usize)> {
+    let a1 = machine.a.0 as f64;
+    let a2 = machine.a.1 as f64;
+    let b1 = machine.b.0 as f64;
+    let b2 = machine.b.1 as f64;
+    let c1 = machine.prize.0 as f64;
+    let c2 = machine.prize.1 as f64;
+
+    let multiplier = a2 / a1;
+    let new_b2 = b2 - multiplier * b1;
+    let new_c2 = c2 - multiplier * c1;
+    let b_presses = new_c2 / new_b2;
+    let a_presses = (c1 - b1 * b_presses) / a1;
+
+    let (a_cast, b_cast) = (a_presses.round() as usize, b_presses.round() as usize);
+    if a_cast * machine.a.0 + b_cast * machine.b.0 != machine.prize.0 ||
+        a_cast * machine.a.1 + b_cast * machine.b.1 != machine.prize.1 {
         return None;
     }
 
-    let (new_y, new_x) = (new_y as usize, new_x as usize);
-    trails
-        .get(new_y)
-        .and_then(|row| row.get(new_x))
-        .map(|neighbor_val| (neighbor_val, Pos(new_x, new_y)))
-}
-
-fn traverse(
-    map: &Vec<Vec<char>>,
-    c_pos: Pos,
-    corners: &mut HashMap<Pos, Vec<Pos>>,
-    visited_pos: &mut Vec<Pos>,
-) -> (usize, usize) {
-    let current_val = map[c_pos.1][c_pos.0];
-    if visited_pos.contains(&c_pos) {
-        return (0, 0);
-    } else {
-        visited_pos.push(c_pos);
-    }
-
-    c_pos.corners().iter().for_each(|corner| {
-        corners
-            .entry(*corner)
-            .and_modify(|v| v.push(c_pos))
-            .or_insert(vec![c_pos]);
-    });
-
-    let neighbors = [
-        get_neighbor(map, &c_pos, -1, 0),// left
-        get_neighbor(map, &c_pos, 1, 0), // right
-        get_neighbor(map, &c_pos, 0, -1),// up
-        get_neighbor(map, &c_pos, 0, 1), // down
-    ];
-    let mut area = 1;
-    let mut perimeter = 4;
-
-    for &(&value, pos) in neighbors.iter().flatten() {
-        if value == current_val {
-            perimeter -= 1;
-            let next_paths = traverse(map, pos, corners, visited_pos);
-            area += next_paths.0;
-            perimeter += next_paths.1;
-        }
-    }
-
-    (area, perimeter)
+    Some((a_cast, b_cast))
 }
 
 fn main() {
     let mut score_p1 = 0;
     let mut score_p2 = 0;
     let mut puzzle_lines = io::stdin().lock().lines();
-    let mut map: Vec<Vec<char>> = vec![];
+    let mut machine_id = 0usize;
+    let mut machines: Vec<Machine> = vec![];
+    let re = regex::Regex::new(r"X=(\d+), Y=(\d+)").unwrap();
     while let Some(Ok(puzzle_line)) = puzzle_lines.next() {
-        let garden_row: Vec<char> = puzzle_line.chars().collect();
-        map.push(garden_row);
+        if puzzle_line.starts_with("Button A:") {
+            let x = puzzle_line.get(12..14).unwrap().parse::<usize>().unwrap();
+            let y = puzzle_line.get(18..20).unwrap().parse::<usize>().unwrap();
+            machines.push(Machine { prize: Pos(0, 0), a: Pos(x, y), b: Pos(0, 0) });
+        }
+        if puzzle_line.starts_with("Button B:") {
+            let x = puzzle_line.get(12..14).unwrap().parse::<usize>().unwrap();
+            let y = puzzle_line.get(18..20).unwrap().parse::<usize>().unwrap();
+            machines[machine_id].b = Pos(x, y);
+        }
+        if puzzle_line.starts_with("Prize:") {
+            let caps = re.captures(&*puzzle_line).unwrap();
+            let x = caps.get(1).unwrap().as_str().parse::<usize>().unwrap();
+            let y = caps.get(2).unwrap().as_str().parse::<usize>().unwrap();
+            machines[machine_id].prize = Pos(x, y);
+            machine_id += 1;
+        }
     }
-    let width = map[0].len();
-    let height = map.len();
+    for machine in machines {
+        if let Some((a, b)) = solve_alt(machine) {
+            let cost = (a * A_COST) + (b * B_COST);
+            score_p1 += cost;
+        }
+        let mut unit_converted_machine = machine.clone();
+        unit_converted_machine.prize.0 += 10000000000000;
+        unit_converted_machine.prize.1 += 10000000000000;
+        if let Some((a, b)) = solve_alt(unit_converted_machine) {
+            let cost = (a * A_COST) + (b * B_COST);
+            score_p2 += cost;
+        }
+    }
 
     println!("score_p1: {score_p1}");
     println!("score_p2: {score_p2}");
