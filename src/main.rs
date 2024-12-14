@@ -1,94 +1,87 @@
+use regex::Regex;
 use std::io;
 use std::io::BufRead;
 
 // (x,y)
 #[derive(Debug, Clone, Copy, Default)]
-struct Pos(usize, usize);
+struct Pos(isize, isize);
 
 #[derive(Debug, Clone, Copy, Default)]
-struct Machine {
-    prize: Pos,
-    a: Pos,
-    b: Pos,
+struct Robot {
+    pos: Pos,
+    vel: Pos,
 }
 
 const A_COST: usize = 3;
 const B_COST: usize = 1;
+const WIDE: isize = 101;
+const TALL: isize = 103;
+// const WIDE: isize = 11;
+// const TALL: isize = 7;
 
-// elimination method
-#[inline(always)]
-fn solve(machine: Machine) -> Option<(usize, usize)> {
-    let a1 = machine.a.0 as f64;
-    let a2 = machine.a.1 as f64;
-    let b1 = machine.b.0 as f64;
-    let b2 = machine.b.1 as f64;
-    let c1 = machine.prize.0 as f64;
-    let c2 = machine.prize.1 as f64;
-
-    let multiplier = a2 / a1;
-    let new_b2 = b2 - multiplier * b1;
-    let new_c2 = c2 - multiplier * c1;
-    let b_presses = new_c2 / new_b2;
-    let a_presses = (c1 - b1 * b_presses) / a1;
-
-    let (a_cast, b_cast) = (a_presses.round() as usize, b_presses.round() as usize);
-    if a_cast * machine.a.0 + b_cast * machine.b.0 != machine.prize.0 ||
-        a_cast * machine.a.1 + b_cast * machine.b.1 != machine.prize.1 {
-        return None;
+fn euclidean_mod(a: isize, b: isize) -> isize {
+    let rem = a % b;
+    if rem < 0 {
+        rem + b
+    } else {
+        rem
     }
-
-    Some((a_cast, b_cast))
 }
 
 #[inline(always)]
-fn parse_prize_line(line: String) -> Option<(usize, usize)> {
-    let chars = line.chars().skip(8);
+fn advance(machine: &mut Robot, t: isize) {
+    let x = machine.pos.0;
+    let y = machine.pos.1;
+    let dx = machine.vel.0 * t;
+    let dy = machine.vel.1 * t;
 
-    let x_start = 0;
-    let x_end = chars.clone().skip(x_start + 1).position(|c| c == ',')?;
-    let x_str: String = chars.clone().skip(x_start + 1).take(x_end).collect();
-    let x = x_str.parse::<usize>().ok()?;
-
-    let y_start = chars.clone().skip(x_start + x_end + 2).position(|c| c == '=')?;
-    let y_str: String = chars.skip(x_start + x_end + y_start + 3).collect();
-    let y = y_str.parse::<usize>().ok()?;
-
-    Some((x, y))
+    machine.pos.0 = euclidean_mod(x + dx, WIDE);
+    machine.pos.1 = euclidean_mod(y + dy, TALL);
 }
-
 
 fn main() {
     let mut score_p1 = 0;
     let mut score_p2 = 0;
     let mut puzzle_lines = io::stdin().lock().lines();
-    let mut machine: Machine = Machine::default();
+    let re = Regex::new(r"p=(\d+),(\d+) v=(-?\d+),(-?\d+)").unwrap();
+    let mut robot: Robot = Robot::default();
+    let mut quad_top_left = 0;
+    let mut quad_top_right = 0;
+    let mut quad_bottom_left = 0;
+    let mut quad_bottom_right = 0;
     while let Some(Ok(puzzle_line)) = puzzle_lines.next() {
-        if puzzle_line.starts_with("Button A:") {
-            let x = puzzle_line.get(12..14).unwrap().parse::<usize>().unwrap();
-            let y = puzzle_line.get(18..20).unwrap().parse::<usize>().unwrap();
-            machine = Machine { prize: Pos(0, 0), a: Pos(x, y), b: Pos(0, 0) };
-        }
-        if puzzle_line.starts_with("Button B:") {
-            let x = puzzle_line.get(12..14).unwrap().parse::<usize>().unwrap();
-            let y = puzzle_line.get(18..20).unwrap().parse::<usize>().unwrap();
-            machine.b = Pos(x, y);
-        }
-        if puzzle_line.starts_with("Prize:") {
-            let (x, y) = parse_prize_line(puzzle_line).unwrap();
-            machine.prize = Pos(x, y);
-
-            if let Some((a, b)) = solve(machine) {
-                let cost = (a * A_COST) + (b * B_COST);
-                score_p1 += cost;
+        let caps = re.captures(&*puzzle_line).unwrap();
+        let mut robot = Robot {
+            pos: Pos(caps.get(1).unwrap().as_str().parse::<isize>().unwrap(), caps.get(2).unwrap().as_str().parse::<isize>().unwrap()),
+            vel: Pos(caps.get(3).unwrap().as_str().parse::<isize>().unwrap(), caps.get(4).unwrap().as_str().parse::<isize>().unwrap()),
+        };
+        println!("{robot:?}");
+        println!("sanity {}, {}, {}", 15 % 10, -15 % 10, euclidean_mod(-15 , 10));
+        for t in 0..5 {
+            println!("After {t} seconds ({},{})", robot.pos.0, robot.pos.1);
+            for py in 0..TALL {
+                for px in 0..WIDE {
+                    if robot.pos.0 == px && robot.pos.1 == py {
+                        print!("1");
+                    } else {
+                        print!(".");
+                    }
+                }
+                println!();
             }
-            machine.prize.0 += 10000000000000;
-            machine.prize.1 += 10000000000000;
-            if let Some((a, b)) = solve(machine) {
-                let cost = (a * A_COST) + (b * B_COST);
-                score_p2 += cost;
-            }
+            advance(&mut robot, 1);
         }
+        // advance(&mut robot, 100);
+        match robot.pos {
+            Pos(x, y) if x < WIDE / 2 && y < TALL / 2 => quad_top_left += 1,
+            Pos(x, y) if x > WIDE / 2 && y < TALL / 2 => quad_top_right += 1,
+            Pos(x, y) if x < WIDE / 2 && y > TALL / 2 => quad_bottom_left += 1,
+            Pos(x, y) if x > WIDE / 2 && y > TALL / 2 => quad_bottom_right += 1,
+            _ => println!("robot {robot:?} on median"),
+        }
+        // let cost = (a * A_COST) + (b * B_COST);
     }
+    score_p1 += quad_top_left * quad_top_right * quad_bottom_left * quad_bottom_right;
 
     println!("score_p1: {score_p1}");
     println!("score_p2: {score_p2}");
