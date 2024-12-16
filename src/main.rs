@@ -34,8 +34,8 @@ impl ToTile for char {
     fn to_tile(&self) -> Tile {
         match *self {
             '#' => Tile::Wall,
-            'S' => Tile::End,
-            'E' => Tile::Start,
+            'S' => Tile::Start,
+            'E' => Tile::End,
             '@' => Tile::Deer,
             '.' => Tile::None,
             _ => Tile::None,
