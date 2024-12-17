@@ -1,5 +1,6 @@
-use std::io;
+use std::{io, thread};
 use std::io::BufRead;
+use std::sync::{Arc, Mutex};
 
 /**
 ADV(0) - COMBO - division numerator in ra, 2^combo denominator, trunc int, store ra
@@ -112,54 +113,79 @@ fn main() {
 
     let instr_len = computer.program.len();
     println!("instr_len({instr_len}) instruction_ptr({})", computer.instruction_ptr);
-    let computer_clone = computer.clone();
-    let mut vra = 24847151usize;
-    loop {
-        computer = computer_clone.clone();
-        computer.ra = vra;
-        while computer.instruction_ptr + 1 < instr_len {
-            println!("vra({vra})instr_len({instr_len}) instruction_ptr({})", computer.instruction_ptr);
-            match computer.opcode() {
-                Instruction::ADV => {
-                    computer.ra = computer.ra / (2u32.pow(computer.combo_operand() as u32) as usize);
+    let num_threads = 8;
+    let start_vra = 117400usize;
+    let mut handles = Vec::with_capacity(num_threads);
+
+    for thread_id in 0..num_threads {
+        let computer_clone = computer.clone();
+        let thread_start_vra = start_vra + thread_id; // Stagger start values
+
+        handles.push(thread::spawn(move || {
+            let ogcomputer = computer_clone.clone();
+            let mut computer = computer_clone.clone();
+            let mut vra = thread_start_vra;
+
+            'outer: loop {
+                computer = computer.clone(); // Important: clone for each iteration
+                computer.ra = vra;
+                while computer.instruction_ptr + 1 < instr_len {
+                    print!("a");
+                    // Removed println! inside the loop for performance in parallel execution
+                    match computer.opcode() {
+                        Instruction::ADV => {
+                            computer.ra = computer.ra / (2u32.pow(computer.combo_operand() as u32) as usize);
+                        }
+                        Instruction::BDV => {
+                            computer.rb = computer.ra / (2u32.pow(computer.combo_operand() as u32) as usize);
+                        }
+                        Instruction::CDV => {
+                            computer.rc = computer.ra / (2u32.pow(computer.combo_operand() as u32) as usize);
+                        }
+                        Instruction::BXL => {
+                            computer.rb = computer.rb ^ computer.literal_operand();
+                        }
+                        Instruction::BST => {
+                            computer.rb = computer.combo_operand() % 8;
+                        }
+                        Instruction::JNZ if computer.ra != 0 => {
+                            computer.instruction_ptr = computer.literal_operand();
+                            continue;
+                        }
+                        Instruction::BXC => {
+                            computer.rb = computer.rb ^ computer.rc;
+                        }
+                        Instruction::OUT => {
+                            println!("{:#?}", computer);
+                            computer.output.push((computer.combo_operand() % 8) as u8);
+                            // let og_prog_len = ogcomputer.program.len();
+                            // let current_output_len = computer.output.len();
+                            // if og_prog_len <= current_output_len && ogcomputer.program[computer.output.len() - 1] != computer.output[computer.output.len() -1] {
+                            //     // aborted early for different outputs
+                            //     break;
+                            // }
+                        }
+                        _ => {}
+                    }
+                    computer.instruction_ptr += 2;
                 }
-                Instruction::BDV => {
-                    computer.rb = computer.ra / (2u32.pow(computer.combo_operand() as u32) as usize);
+                if ogcomputer.is_copy(&computer) { // Check against original clone
+                    println!("Thread {} found a match! vra: {}", thread_id, vra);
+                    break 'outer; // Break the inner loop, continue to the next vra
                 }
-                Instruction::CDV => {
-                    computer.rc = computer.ra / (2u32.pow(computer.combo_operand() as u32) as usize);
-                }
-                Instruction::BXL => {
-                    computer.rb = computer.rb ^ computer.literal_operand();
-                }
-                Instruction::BST => {
-                    computer.rb = computer.combo_operand() % 8
-                }
-                Instruction::JNZ if computer.ra != 0 => {
-                    computer.instruction_ptr = computer.literal_operand();
-                    continue;
-                }
-                Instruction::BXC => {
-                    computer.rb = computer.rb ^ computer.rc;
-                }
-                Instruction::OUT => {
-                    computer.output.push((computer.combo_operand() % 8) as u8)
-                }
-                _ => {}
+                vra += num_threads; // Increment by the number of threads for even distribution
             }
-            computer.instruction_ptr += 2;
-        }
-        if computer_clone.is_copy(&computer) {
-            break;
-        };
-        vra += 1;
+        }));
     }
 
-    println!("vra at exit: {vra}");
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
     println!("computer: {computer:#?}");
     let out2 = computer.output.iter()
         .map(|num| num.to_string()) // Convert each usize to String
         .collect::<Vec<String>>() // Collect into a Vec<String>
         .join(",");
-    println!("output: {output} or [{out2}]");
+    println!("output: {output:?} or [{out2}]");
 }
