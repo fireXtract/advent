@@ -133,7 +133,7 @@ fn shortest_path(
                         });
                     }
                 } else {
-                    println!("Blocked by wall at ({}, {})", new_row, new_col);
+                    // println!("Blocked by wall at ({}, {})", new_row, new_col);
                 }
             }
         }
@@ -152,16 +152,16 @@ fn shortest_path(
         current = prev[current.0][current.1];
     }
 
-    for r in &dist {
-        for &c in r {
-            if c == usize::MAX {
-                print!("#######");
-            } else {
-                print!("[{:05x}]", c);
-            }
-        }
-        println!();
-    }
+    // for r in &dist {
+    //     for &c in r {
+    //         if c == usize::MAX {
+    //             print!("#######");
+    //         } else {
+    //             print!("[{:05x}]", c);
+    //         }
+    //     }
+    //     println!();
+    // }
 
     path.push((start_row, start_col));
     path.reverse();
@@ -171,48 +171,58 @@ fn shortest_path(
 
 
 fn main() {
+    let mut bytes = 1024isize;
     let mut puzzle_lines = io::stdin().lock().lines();
-    let mut map: Vec<Vec<bool>> = vec![vec![true; 7]; 7];
-    let mut start = (0usize, 0usize);
-    let mut end = (6usize, 6usize);
-    let (mut row, mut col) = (0usize, 0usize);
-    let mut bytes = 12isize;
+    let mut bytes_list: Vec<(usize, usize)> = vec![];
     while let Some(Ok(puzzle_line)) = puzzle_lines.next() {
-        if bytes > 0 {
-            let byte_pos: Vec<usize> = puzzle_line.split(',').map(|v| v.parse::<usize>().unwrap()).collect();
-            println!("{},{}", byte_pos[0], byte_pos[1]);
-            map[byte_pos[1]][byte_pos[0]] = false;
-        }
-        bytes -= 1;
+        let byte_pos: Vec<usize> = puzzle_line.split(',').map(|v| v.parse::<usize>().unwrap()).collect();
+        println!("{},{}", byte_pos[0], byte_pos[1]);
+        bytes_list.push((byte_pos[0], byte_pos[1]));
     }
 
-    let printing_map = map.clone();
-    for (y, row) in printing_map.clone().iter().enumerate() {
-        for (x, &cell) in row.iter().enumerate() {
-            if cell {
-                print!(".");
-            } else {
-                print!("#");
-            }
+    for bytes in 1024..3450 {
+        let mut bytes = bytes;
+        let mut map: Vec<Vec<bool>> = vec![vec![true; 71]; 71];
+        let mut start = (0usize, 0usize);
+        let mut end = (70usize, 70usize);
+        let mut last_byte: (usize,usize) = (0,0);
+        for i in 0..bytes {
+            map[bytes_list[i].1][bytes_list[i].0] = false;
+            last_byte = (bytes_list[i].1, bytes_list[i].0);
         }
-        println!();
-    }
 
-    let (shortest, score_p1) = shortest_path(&map, start.0, start.1, end.0, end.1);
-    for (row, cells) in printing_map.iter().enumerate() {
-        for (col, &cell) in cells.iter().enumerate() {
-            if shortest.contains(&(row, col)) {
-                print!("@");
-            } else {
-                if cell {
-                    print!(".");
-                } else {
-                    print!("#");
-                }
-            }
+
+        let printing_map = map.clone();
+        // for (y, row) in printing_map.clone().iter().enumerate() {
+        //     for (x, &cell) in row.iter().enumerate() {
+        //         if cell {
+        //             print!(".");
+        //         } else {
+        //             print!("#");
+        //         }
+        //     }
+        //     println!();
+        // }
+
+        let (shortest, score_p1) = shortest_path(&map, start.0, start.1, end.0, end.1);
+        // for (row, cells) in printing_map.iter().enumerate() {
+        //     for (col, &cell) in cells.iter().enumerate() {
+        //         if shortest.contains(&(row, col)) {
+        //             print!("@");
+        //         } else {
+        //             if cell {
+        //                 print!(".");
+        //             } else {
+        //                 print!("#");
+        //             }
+        //         }
+        //     }
+        //     println!();
+        // }
+        if score_p1 == usize::MAX {
+            println!("unreachable score: {score_p1} last_byte: {last_byte:?}");
+        } else {
+            println!("reachable score: {score_p1} last_byte: {last_byte:?}");
         }
-        println!();
     }
-
-    println!("score: {score_p1}");
 }
