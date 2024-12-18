@@ -1,6 +1,8 @@
 use std::{io, thread};
 use std::io::BufRead;
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 
 /**
 ADV(0) - COMBO - division numerator in ra, 2^combo denominator, trunc int, store ra
@@ -113,24 +115,34 @@ fn main() {
 
     let instr_len = computer.program.len();
     println!("instr_len({instr_len}) instruction_ptr({})", computer.instruction_ptr);
-    let num_threads = 8;
-    let start_vra = 117400usize;
+    let num_threads = 14;
+    let start_vra = 45_185_062_144_410usize;
+    let start_vra = 281_474_976_710_656usize;
     let mut handles = Vec::with_capacity(num_threads);
+    let found_match = Arc::new(AtomicBool::new(false));
+    let matches = Arc::new(Mutex::new(Vec::new()));;
 
     for thread_id in 0..num_threads {
         let computer_clone = computer.clone();
         let thread_start_vra = start_vra + thread_id; // Stagger start values
-
+        println!("thread_start_vra {thread_start_vra}");
+        let found_match = Arc::clone(&found_match);
+        let mut matches = Arc::clone(&matches);
         handles.push(thread::spawn(move || {
             let ogcomputer = computer_clone.clone();
             let mut computer = computer_clone.clone();
             let mut vra = thread_start_vra;
 
             'outer: loop {
-                computer = computer.clone(); // Important: clone for each iteration
+                let mut computer = computer.clone(); // Important: clone for each iteration
                 computer.ra = vra;
+                // println!("({thread_id}) start {:?}", computer);
+                if found_match.load(Ordering::Relaxed) {
+                    break;
+                }
+                // thread::sleep(Duration::from_millis(500));
+                // print!("({thread_id}) vra({vra})");
                 while computer.instruction_ptr + 1 < instr_len {
-                    print!("a");
                     // Removed println! inside the loop for performance in parallel execution
                     match computer.opcode() {
                         Instruction::ADV => {
@@ -156,14 +168,23 @@ fn main() {
                             computer.rb = computer.rb ^ computer.rc;
                         }
                         Instruction::OUT => {
-                            println!("{:#?}", computer);
+                            // println!("{:?}", computer);
                             computer.output.push((computer.combo_operand() % 8) as u8);
-                            // let og_prog_len = ogcomputer.program.len();
-                            // let current_output_len = computer.output.len();
-                            // if og_prog_len <= current_output_len && ogcomputer.program[computer.output.len() - 1] != computer.output[computer.output.len() -1] {
-                            //     // aborted early for different outputs
-                            //     break;
-                            // }
+                            let og_prog_len = ogcomputer.program.len();
+                            let current_output_len = computer.output.len();
+                            let diff = og_prog_len as isize - current_output_len as isize;
+                            if current_output_len <= og_prog_len {
+                                 if ogcomputer.program[current_output_len - 1] != computer.output[current_output_len - 1] {
+                                     if current_output_len >= 10 || diff < 0 {
+                                         println!("({thread_id}) was close ({diff}) with vra {vra} but was {:?}", computer);
+                                     }
+                                    // aborted early for different outputs
+                                    break;
+                                }
+                            }
+                            if current_output_len >= 10 || diff < 0 {
+                                println!("({thread_id}) was close ({diff}) with vra {vra} but was {:?}", computer);
+                            }
                         }
                         _ => {}
                     }
@@ -171,6 +192,9 @@ fn main() {
                 }
                 if ogcomputer.is_copy(&computer) { // Check against original clone
                     println!("Thread {} found a match! vra: {}", thread_id, vra);
+                    let mut matches = matches.lock().unwrap();
+                    matches.push(vra);
+                    found_match.store(true, Ordering::Relaxed);
                     break 'outer; // Break the inner loop, continue to the next vra
                 }
                 vra += num_threads; // Increment by the number of threads for even distribution
@@ -181,6 +205,9 @@ fn main() {
     for handle in handles {
         handle.join().unwrap();
     }
+    let matches = matches.lock().unwrap();
+    let lowest_match = matches.iter().min().unwrap();
+    println!("smallest match was ra: {lowest_match}");
 
     println!("computer: {computer:#?}");
     let out2 = computer.output.iter()
