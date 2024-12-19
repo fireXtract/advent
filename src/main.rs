@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::io;
 use std::io::BufRead;
 
-fn ways_possible(patterns: &HashMap<u8, Vec<String>>, design: &str, cache: &mut HashMap<String, usize>) -> usize {
+fn ways_possible(design: &str, patterns: &HashMap<u8, Vec<String>>, cache: &mut HashMap<String, usize>) -> usize {
     if design.len() == 0 {
         return 1;
     }
@@ -13,12 +13,12 @@ fn ways_possible(patterns: &HashMap<u8, Vec<String>>, design: &str, cache: &mut 
     let mut ways = 0;
     for len in (1..=design.len()).rev() {
         let sub = &design[0..len];
-        if let Some(&first_byte) = sub.as_bytes().first() {
-            if let Some(valid_patterns) = patterns.get(&first_byte) {
+        if let Some(first_byte) = sub.as_bytes().first() {
+            if let Some(valid_patterns) = patterns.get(first_byte) {
                 for pattern in valid_patterns {
                     if sub == pattern {
                         let remaining_design = &design[len..];
-                        ways += ways_possible(patterns, remaining_design, cache);
+                        ways += ways_possible(remaining_design, patterns, cache);
                     }
                 }
             }
@@ -43,10 +43,8 @@ fn main() {
                 patterns.entry(key).and_modify(|m| m.push(p.clone())).or_insert_with(|| vec![p]);
             }
         } else if puzzle_line.len() > 0 {
-            total_ways += ways_possible(&patterns, puzzle_line.as_str(), &mut cache);
-            // println!("current possible count: {possible} at {puzzle_line} and {patterns:?} ");
+            total_ways += ways_possible(puzzle_line.as_str(), &patterns, &mut cache);
         }
     }
-    // println!("{patterns:?}");
     println!("{total_ways}");
 }
