@@ -25,3 +25,11 @@ cargo build --release
 ``` shell
 hyperfine --setup 'cargo build --release' --warmup 3 --shell zsh './target/release/advent.exe < ./src/day11/input' 
 ```
+
+### Helper
+
+```shell
+DAYXX=day20
+mkdir src/$DAYXX
+touch src/$DAYXX/input{,a,b}
+```
