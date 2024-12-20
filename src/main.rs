@@ -1,10 +1,8 @@
 use std::cmp::Ordering;
-use std::collections::BinaryHeap;
+use std::collections::{BinaryHeap, HashSet};
 use std::fmt::Formatter;
 use std::io::BufRead;
-use std::{fmt, io, thread};
-use std::char::MAX;
-use std::time::Duration;
+use std::{fmt, io};
 
 #[derive(PartialEq, Eq, Hash, Copy, Clone)]
 enum Tile {
@@ -67,16 +65,18 @@ impl PartialOrd for State {
         Some(self.cmp(other))
     }
 }
-const TURN_COST: usize = 1000;
+// inputa w/ no skips 84 minimum 16
+
 const MAX_SKIPS: usize = 2;
+
 fn shortest_path(
     grid: &[Vec<bool>],
     start_row: usize,
     start_col: usize,
     end_row: usize,
     end_col: usize,
-
-) -> Option<(Vec<(usize, usize)>, usize)> {
+    unskippable: &HashSet<(usize, usize)>,
+) -> Option<(Vec<(usize, usize)>, usize, Vec<(usize, usize)>)> {
     let rows = grid.len();
     let cols = grid[0].len();
 
@@ -111,7 +111,7 @@ fn shortest_path(
                 let is_wall = !grid[nr][nc];
                 let next_cost = cost + 1;
 
-                if is_wall && skips_remaining > 0 {
+                if is_wall && skips_remaining > 0 && !unskippable.contains(&(nr, nc)) {
                     if next_cost < dist[nr][nc][(skips_remaining - 1)] {
                         dist[nr][nc][skips_remaining - 1] = next_cost;
                         prev[nr][nc][skips_remaining - 1] = (row, col, skips_remaining);
@@ -129,18 +129,28 @@ fn shortest_path(
 
     if let Some(State { cost, row: _, col: _, skips_remaining }) = end_state {
         let mut path = Vec::new();
+        let mut skipped_walls = Vec::new(); // Store skipped walls
         let mut current = (end_row, end_col, skips_remaining);
 
         while current != (start_row, start_col, MAX_SKIPS) {
             path.push((current.0, current.1));
-            current = prev[current.0][current.1][current.2]; // Correct lookup
+            let previous = prev[current.0][current.1][current.2];
+            if previous.0 != usize::MAX {
+                let prev_skips = previous.2;
+                if skips_remaining > prev_skips {
+                    skipped_walls.push((current.0, current.1)); // Record skip
+                }
+                current = previous;
+            } else {
+                break;
+            }
         }
 
         path.push((start_row, start_col));
         path.reverse();
-        return Some((path, cost));
+        Some((path, cost, skipped_walls))
     } else {
-        return None;
+        None
     }
 }
 
@@ -172,9 +182,9 @@ fn main() {
                 map_tile_row.push(tile);
                 map_row.push(tile != Tile::Wall);
                 if tile == Tile::Start {
-                    start = (x, y);
+                    start = (y, x);
                 } else if tile == Tile::End {
-                    end = (x, y);
+                    end = (y, x);
                 }
             }
             x += 1;
@@ -201,26 +211,33 @@ fn main() {
         }
         println!();
     }
-
-    if let Some((shortest, score_p1)) = shortest_path(&map, start.0, start.1, end.0, end.1) {
-        if score_p1 == usize::MAX {
-            println!("unreachable score: {score_p1}");
-        } else {
-            println!("reachable score: {score_p1}");
-        }
-        for (row, cells) in printing_map.iter().enumerate() {
-            for (col, &cell) in cells.iter().enumerate() {
-                if shortest.contains(&(row, col)) {
-                    print!("@");
-                } else {
-                    if cell {
-                        print!(".");
+    let Some((shortest, score_p1, skipped)) = shortest_path(&map, start.0, start.1, end.0, end.1, &HashSet::new());
+    println!("fastest route: {shortest:?}");
+    let mut last_skipped: Vec<(usize, usize)> = skipped;
+    let mut last_skips: HashSet<(usize, usize)> = HashSet::from(last_skipped);
+    while last_skipped.len() > 0 {
+        if let Some((shortest, score_p1, skipped)) = shortest_path(&map, start.0, start.1, end.0, end.1, &last_skips) {
+            last_skips.extend(skipped.iter());
+            last_skipped = skipped;
+            if score_p1 == usize::MAX {
+                println!("unreachable score: {score_p1}");
+            } else {
+                println!("reachable score: {score_p1}");
+            }
+            for (row, cells) in printing_map.iter().enumerate() {
+                for (col, &cell) in cells.iter().enumerate() {
+                    if shortest.contains(&(row, col)) {
+                        print!("@");
                     } else {
-                        print!("#");
+                        if cell {
+                            print!(".");
+                        } else {
+                            print!("#");
+                        }
                     }
                 }
+                println!();
             }
-            println!();
         }
     }
     println!("EOL");
