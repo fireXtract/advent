@@ -29,7 +29,7 @@ hyperfine --setup 'cargo build --release' --warmup 3 --shell zsh './target/relea
 ### Helper
 
 ```shell
-DAYXX=day20
+DAYXX=day21
 mkdir src/$DAYXX
 touch src/$DAYXX/input{,a,b}
 ```
