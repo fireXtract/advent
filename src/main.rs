@@ -76,7 +76,7 @@ fn shortest_path(
     end_row: usize,
     end_col: usize,
     unskippable: &HashSet<(usize, usize)>,
-) -> Option<(Vec<(usize, usize)>, usize, Vec<(usize, usize)>)> {
+) -> Option<(Vec<(usize, usize)>, usize, Vec<((usize, usize), (usize, usize))>)> {
     let rows = grid.len();
     let cols = grid[0].len();
 
@@ -90,7 +90,7 @@ fn shortest_path(
     let mut end_state: Option<State> = None; // Store the end state
 
     while let Some(state @ State { cost, row, col, skips_remaining }) = pq.pop() {
-        println!("{state:?}");
+        // println!("{state:?}");
         if cost > dist[row][col][skips_remaining] {
             continue;
         }
@@ -111,11 +111,26 @@ fn shortest_path(
                 let is_wall = !grid[nr][nc];
                 let next_cost = cost + 1;
 
-                if is_wall && skips_remaining > 0 && !unskippable.contains(&(nr, nc)) {
-                    if next_cost < dist[nr][nc][(skips_remaining - 1)] {
-                        dist[nr][nc][skips_remaining - 1] = next_cost;
-                        prev[nr][nc][skips_remaining - 1] = (row, col, skips_remaining);
-                        pq.push(State { cost: next_cost, row: nr, col: nc, skips_remaining: skips_remaining - 1 });
+                if is_wall {
+                    if skips_remaining == MAX_SKIPS && !unskippable.contains(&(nr, nc)) {
+                        for &(dr2, dc2) in &deltas {
+                            let nr2 = nr as i32 + dr2;
+                            let nc2 = nc as i32 + dc2;
+                            if nr2 >= 0 && nr2 < rows as i32 && nc2 >= 0 && nc2 < cols as i32 {
+                                let nr2 = nr2 as usize;
+                                let nc2 = nc2 as usize;
+
+                                if !grid[nr2][nc2] && !unskippable.contains(&(nr2,nc2)){
+                                    let next_cost = cost + 2;
+                                    if next_cost < dist[nr2][nc2][skips_remaining - 1] {
+                                        dist[nr2][nc2][skips_remaining - 1] = next_cost;
+                                        prev[nr2][nc2][skips_remaining - 1] = (row, col, skips_remaining);
+                                        pq.push(State { cost: next_cost, row: nr2, col: nc2, skips_remaining: skips_remaining - 1 });
+                                    }
+                                    break;
+                                }
+                            }
+                        }
                     }
                 } else if !is_wall && next_cost < dist[nr][nc][skips_remaining] {
                     dist[nr][nc][skips_remaining] = next_cost;
@@ -129,16 +144,30 @@ fn shortest_path(
 
     if let Some(State { cost, row: _, col: _, skips_remaining }) = end_state {
         let mut path = Vec::new();
-        let mut skipped_walls = Vec::new(); // Store skipped walls
+        let mut skipped_walls: Vec<((usize, usize), (usize, usize))> = Vec::new();
         let mut current = (end_row, end_col, skips_remaining);
 
         while current != (start_row, start_col, MAX_SKIPS) {
             path.push((current.0, current.1));
             let previous = prev[current.0][current.1][current.2];
             if previous.0 != usize::MAX {
+                let prev_row = previous.0;
+                let prev_col = previous.1;
                 let prev_skips = previous.2;
                 if skips_remaining > prev_skips {
-                    skipped_walls.push((current.0, current.1)); // Record skip
+                    // Find the skipped wall
+                    println!("finding skipped wall");
+                    let current_row = current.0;
+                    let current_col = current.1;
+                    let dr = current_row as i32 - prev_row as i32;
+                    let dc = current_col as i32 - prev_col as i32;
+
+                    let skipped_wall1 = (prev_row as i32 + dr, prev_col as i32 + dc);
+                    let skipped_wall2 = (current_row as i32, current_col as i32);
+                    skipped_walls.push((
+                        (skipped_wall1.0 as usize, skipped_wall1.1 as usize),
+                        (skipped_wall2.0 as usize, skipped_wall2.1 as usize),
+                    ));
                 }
                 current = previous;
             } else {
@@ -199,9 +228,9 @@ fn main() {
     let printing_map = map.clone();
     for (y, row) in printing_map.clone().iter().enumerate() {
         for (x, &cell) in row.iter().enumerate() {
-            if start.0 == x && start.1 == y {
+            if start.1 == x && start.0 == y {
                 print!("S");
-            } else if end.0 == x && end.1 == y {
+            } else if end.1 == x && end.0 == y {
                 print!("E");
             } else if cell {
                 print!(".");
@@ -211,14 +240,15 @@ fn main() {
         }
         println!();
     }
-    let Some((shortest, score_p1, skipped)) = shortest_path(&map, start.0, start.1, end.0, end.1, &HashSet::new());
-    println!("fastest route: {shortest:?}");
-    let mut last_skipped: Vec<(usize, usize)> = skipped;
-    let mut last_skips: HashSet<(usize, usize)> = HashSet::from(last_skipped);
-    while last_skipped.len() > 0 {
-        if let Some((shortest, score_p1, skipped)) = shortest_path(&map, start.0, start.1, end.0, end.1, &last_skips) {
-            last_skips.extend(skipped.iter());
-            last_skipped = skipped;
+    // let Some((shortest, score_p1, skipped)) = shortest_path(&map, start.0, start.1, end.0, end.1, &HashSet::new());
+    // println!("fastest route: {shortest:?}");
+    // let mut last_skipped: Vec<(usize, usize)> = skipped;
+    // let mut last_skips: HashSet<(usize, usize)> = HashSet::from(last_skipped);
+    // while last_skipped.len() > 0 {
+        if let Some((shortest, score_p1, skipped)) = shortest_path(&map, start.0, start.1, end.0, end.1, &HashSet::new()) {
+            // last_skips.extend(skipped.iter());
+            // last_skipped = skipped;
+            println!("skipped {skipped:?}");
             if score_p1 == usize::MAX {
                 println!("unreachable score: {score_p1}");
             } else {
@@ -238,7 +268,7 @@ fn main() {
                 }
                 println!();
             }
-        }
+        // }
     }
     println!("EOL");
 }
