@@ -1,0 +1,66 @@
+use std::io;
+use std::io::BufRead;
+
+/** Activate */
+const A: i8 = i8::MAX;
+
+/** Panic*/
+const P: i8 = i8::MAX - 1;
+const KEYPAD_GRID: Vec<Vec<i8>> = vec![
+    vec![7, 8, 9],
+    vec![4, 5, 6],
+    vec![1, 2, 3],
+    vec![P, 0, A]
+];
+const KEYPAD_START: (usize,usize) = (3,2);
+/** row,col */
+const DPAD_GRID: Vec<Vec<(i8, i8)>> = vec![
+    vec![(P, P),    (-1, 0), (A, A)],
+    vec![(0, -1),   ( 1, 0), (0, 1)]
+];
+
+const DPAD_START: (usize,usize) = (0,2);
+
+struct Keypad {
+    cursor_row: usize,
+    cursor_col: usize,
+}
+
+fn solve_keypad(input: Vec<isize>) -> Vec<(isize,isize)> {
+    let out: Vec<(isize,isize)> = vec![];
+    let pos = KEYPAD_START;
+    let last_dir = (0i8,0i8);
+    for key in input {
+
+    }
+
+    out
+}
+
+fn solve_dpad(input: Vec<(isize,isize)>) -> Vec<(isize,isize)> {
+    let out: Vec<(isize,isize)> = vec![];
+    let pos = KEYPAD_START;
+    for key in input {
+
+    }
+
+    out
+}
+
+
+fn main() {
+    let mut puzzle_lines = io::stdin().lock().lines();
+    let (mut start, mut end) = ((0usize, 0usize), (0usize, 0usize));
+    let (mut x, mut y) = (0usize, 0usize);
+    while let Some(Ok(puzzle_line)) = puzzle_lines.next() {
+        for c in puzzle_line.chars() {
+            x += 1;
+        }
+
+        y += 1;
+        x = 0;
+    }
+
+
+    println!("EOL");
+}
