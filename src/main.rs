@@ -5,18 +5,22 @@ use rand::prelude::*;
 
 const SECRET_COUNT: usize = 2000;
 
+#[inline(always)]
 fn mix(value: usize, secret_number: usize) -> usize {
     value ^ secret_number
 }
 
+#[inline(always)]
 fn prune(secret_number: usize) -> usize {
     secret_number % 16777216
 }
 
+#[inline(always)]
 fn price(secret_number: usize) -> isize {
     (secret_number % 10) as isize
 }
 
+#[inline(always)]
 fn solve(initial: usize) -> Vec<usize> {
     let mut v: Vec<usize> = vec![initial];
     let mut secret_number = initial;
@@ -30,6 +34,7 @@ fn solve(initial: usize) -> Vec<usize> {
     v
 }
 
+#[inline(always)]
 fn solve2(secret_numbers: Vec<isize>, sequence: &[isize; 4]) -> isize {
     let mut v2: [isize; 4] = [0isize; 4];
     let mut count = 1;
@@ -77,11 +82,6 @@ fn main() {
     }
     println!("{each_last:?}");
     let sum: usize = each_last.iter().map(|(_, last_secret)| last_secret).sum();
-    println!("sum p1: {sum}");
-    println!("price of 123 {}", price(123));
-    println!("price of 15887950 {}", price(15887950));
-    println!("price of 16495136 {}", price(16495136));
-    println!("price of 527345 {}", price(527345));
 
     let mut vprices : Vec<Vec<isize>> = vec![];
     for (_, secrets) in num_secrets {
@@ -91,16 +91,20 @@ fn main() {
         vprices.push(prices);
     }
     let sqnc = &[-2isize, 1isize, -1isize, 3isize];
+
+    let seed: u64 = 42;
+    let mut rng = <StdRng as SeedableRng>::seed_from_u64(seed);
+    let mut create_shuffled_vec = || {
+        let mut vec: Vec<isize> = (-9..=9).collect();
+        vec.shuffle(&mut rng);
+        vec
+    };
+    let i0r = create_shuffled_vec();
+    let i1r = create_shuffled_vec();
+    let i2r = create_shuffled_vec();
+    let i3r = create_shuffled_vec();
+    println!("{i0r:?} {i1r:?} {i2r:?} {i3r:?}");
     let mut biggest_bananas: ([isize;4], isize) = (*sqnc, -1);
-    let mut rng =  rand::rng();
-    let mut i0r: Vec<isize> = (-9isize..=9).collect();
-    i0r.shuffle(&mut rng);
-    let mut i1r: Vec<isize> = (-9isize..=9).collect();
-    i1r.shuffle(&mut rng);
-    let mut i2r: Vec<isize> = (-9isize..=9).collect();
-    i2r.shuffle(&mut rng);
-    let mut i3r: Vec<isize> = (-9isize..=9).collect();
-    i3r.shuffle(&mut rng);
     for &i0 in &i0r {
         for &i1 in &i1r {
             for &i2 in &i2r {
@@ -114,13 +118,14 @@ fn main() {
                         biggest_bananas = (sqnc, bananas);
                         println!("found new biggest_bananas: {biggest_bananas:?}");
                     } else {
-                        println!("dropped not biggest_bananas: {biggest_bananas:?}");
+                        // println!("dropped not biggest_bananas: {biggest_bananas:?} was {sqnc:?} and {bananas}");
                     }
                 }
             }
         }
     }
 
+    println!("sum p1: {sum}");
     println!("bananas: {biggest_bananas:?}");
 
     println!("EOL");
