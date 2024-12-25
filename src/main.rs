@@ -1,45 +1,90 @@
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::HashMap;
 use std::io;
 use std::io::BufRead;
+use crate::Signal::UNKNOWN;
 
-type Graph = HashMap<String, HashSet<String>>;
+#[derive(Debug, Eq, PartialEq)]
+struct Wire {
+    name: String,
+    signal: Signal
+}
+
+impl Wire {
+    fn is_ready(&self) -> bool {
+        [Signal::ZERO,Signal::ONE].contains(&self.signal)
+    }
+}
+
+#[derive(Debug, Eq, PartialEq)]
+enum Signal {
+    XOR(Box<(Wire, Wire)>),
+    AND(Box<(Wire,Wire)>),
+    OR(Box<(Wire,Wire)>),
+    ONE,
+    ZERO,
+    UNKNOWN,
+}
 
 fn main() {
     let mut puzzle_lines = io::stdin().lock().lines();
-    let mut graph: Graph = HashMap::new();
+    let mut wires: Vec<Wire> = vec![];
+    let mut links: HashMap<String, &Wire> = HashMap::new();
     while let Some(Ok(puzzle_line)) = puzzle_lines.next() {
         println!("{puzzle_line}");
-        let mut split = puzzle_line.split('-');
-        let left = split.next().unwrap().to_string();
-        let right = split.next().unwrap().to_string();
+        if puzzle_line.contains(':') {
+            let mut split = puzzle_line.split(": ");
+            let name = split.next();
+            let value = split.next();
+            if value.is_some() {
+                wires.push(Wire{
+                    name: name.unwrap().to_string(),
+                    signal: if value.unwrap() == "1" { Signal::ONE } else {Signal::ZERO }
+                })
+            } else {
+                panic!("Unknown")
+            }
+        } else if puzzle_line.contains("->") {
+            let mut split = puzzle_line.split(" -> ");
+            let left = split.next().unwrap();
+            let right = split.next().unwrap().to_string();
+            match left {
+                xor if xor.contains("XOR") => {
+                    let mut split = puzzle_line.split(" XOR ");
+                    let left_left = split.next().unwrap().to_string();
+                    let left_right = split.next().unwrap().to_string();
+                    let left_wire: Wire = if links.contains_key(&left_left) {
 
-        add_edge(&mut graph, left.clone(), right.clone());
-        add_edge(&mut graph, right, left);
-        println!("{graph:?}");
-    }
-
-    let mut threes: HashSet<BTreeSet<String>> = HashSet::new();
-    for (c0, n0) in &graph {
-        for c1 in n0 {
-            for c2 in &graph[c1] {
-                //if graph[c2].contains(c1) && graph[c2].contains(c0) && graph[c0].contains(c2) && graph[c0].contains(c1) && graph[c1].contains(c0) && graph[c1].contains(c2) {
-                if graph[c2].contains(c1) && graph[c2].contains(c0) && graph[c0].contains(c2) {
-                    if c0.starts_with('t') || c1.starts_with('t') || c2.starts_with('t') {
-                        println!("{c0},{c1},{c2}");
-                        threes.insert(BTreeSet::from([c0.clone(), c1.clone(), c2.clone()]));
-                    }
+                    } else {
+                        Wire {
+                            name: left_left,
+                            signal: UNKNOWN,
+                        }
+                    };
+                    let right_wire: Wire = if links.contains_key(&left_right) {
+                        // links[left_right]
+                        Wire {
+                            name: left_right,
+                            signal: UNKNOWN,
+                        }
+                    } else {
+                        Wire {
+                            name: left_right,
+                            signal: UNKNOWN,
+                        }
+                    };
+                    let xor_wire = Wire {
+                        name: right,
+                        signal: Signal::XOR(Box::new((left_wire,right_wire))),
+                    };
+                    wires.push(xor_wire);
                 }
+                _ => {}
             }
         }
     }
-    println!();
-    println!("unique: {}", threes.len());
-    println!("{threes:?}");
+
+    println!("{wires:?}");
+    println!("{links:?}");
 
     println!("EOL");
-}
-
-fn add_edge(graph: &mut Graph, node1: String, node2: String) {
-    graph.entry(node1.clone()).or_insert_with(HashSet::new).insert(node2.clone());
-    graph.entry(node2.clone()).or_insert_with(HashSet::new).insert(node1.clone());
 }
