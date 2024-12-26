@@ -95,9 +95,33 @@ impl Circuit {
         dot.push_str("digraph circuit {\n");
         dot.push_str("  rankdir=LR;\n"); // Left to right layout
 
-        // Define nodes (wires)
-        for (wire, _) in &self.wire_values {
-            dot.push_str(&format!("  \"{}\" [label=\"{}\"];\n", wire.0, wire.0));
+        // Define nodes (wires) with colors
+        for (wire, signal) in &self.wire_values {
+            let color = if wire.0.starts_with("x") {
+                "yellow"
+            } else if wire.0.starts_with("y") {
+                "orange"
+            } else if wire.0.starts_with("z") {
+                "green"
+            } else if wire.0 == "INPUT" {
+                "grey"
+            } else {
+                "lightblue"
+            };
+            // let shape = if wire.0 == "INPUT"{
+            //     "box"
+            // } else {
+            //     "ellipse"
+            // };
+            // let style = if *signal == Signal::ONE{
+            //     "filled"
+            // } else {
+            //     "solid"
+            // };
+            dot.push_str(&format!(
+                "  \"{}\" [label=\"{}\", fillcolor=\"{}\", style=\"{}\", shape=\"{}\"];\n",
+                wire.0, wire.0, color, "filled", "ellipse"
+            ));
         }
 
         // Define edges (connections)
@@ -116,7 +140,7 @@ impl Circuit {
                     dot.push_str(&format!("  \"{}\" -> \"{}\" [label=\"OR\"];\n", input2.0, output.0));
                 }
                 Gate::INPUT(output) => {
-                    dot.push_str(&format!("  \"INPUT\" -> \"{}\" [label=\"INPUT\"];\n", output.0)); // Input node
+                    dot.push_str(&format!("  \"INPUT\" -> \"{}\" [label=\"INPUT\"];\n", output.0));
                 }
             }
         }
@@ -139,7 +163,7 @@ impl FromStr for Gate {
         println!("expr: {expression:?}");
         println!("output: {output:?}");
 
-        let mut parts: Vec<&str> = expression.splitn(3, " ").collect();
+        let parts: Vec<&str> = expression.splitn(3, " ").collect();
         println!("{parts:?}");
         let gate_str = parts[1];
         let inputs: [WireName; 2] = [parts[0], parts[2]]
